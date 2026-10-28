@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="UMITCK ERP">
+  <meta name="description" content="Kurumsal Kutu & Boru Profil Arama, KG ve Boy Bazlı Fiyatlandırma, Algoritmik Dilme Optimizasyonu ve Çevrimdışı PWA Sistemi">
+  <title>UMITCK ERP — Kurumsal Profil, Dilme & Teklif Sistemi</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./vendor/firebase-app-compat.js"></script>
+  <script src="./vendor/firebase-firestore-compat.js"></script>
+  <script src="./vendor/xlsx.full.min.js" defer></script>
+</head>
+<body>
+
+  <!-- ==================== KURUMSAL ÜST BAR ==================== -->
+  <header class="app-header no-print">
+    <div class="header-inner">
+      <div class="brand-wrap">
+        <div id="headerBrandLogo" class="brand-logo">UC</div>
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <h1 id="headerBrandName" class="brand-title">UMITCK ERP</h1>
+            <span id="firebaseStatusBadge" onclick="switchTab('quote')" style="cursor:pointer;" class="badge badge-blue" title="Firebase Bulut Veritabanı (hesaplama-umitck)">☁️ Firebase Bağlanıyor</span>
+            <span id="netStatusBadge" class="badge badge-emerald" title="Çevrimdışı (Offline) çalışma durumu">✓ Çevrimdışı Hazır</span>
+          </div>
+          <p id="headerBrandSub" class="brand-sub">Algoritmik Profil, KG/Boy Fiyat & Dilme Sistemi</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btnInstallPwa" onclick="handleInstallPwaClick()" class="btn btn-primary btn-sm" title="Uygulamayı telefona veya bilgisayara kur">
+          <span>📲</span>
+          <span class="hide-xs">Yükle</span>
+        </button>
+
+        <button id="btnQuickUpload" onclick="switchTab('files')" class="btn btn-outline btn-sm" title="Excel / CSV / Dosya Yükle">
+          <span>📂</span>
+          <span class="hide-sm">Dosya Yükle</span>
+        </button>
+
+        <button id="btnActiveRole" onclick="openRoleModal()" class="btn btn-outline btn-sm" title="Kullanıcı / Rol Değiştir">
+          <span id="activeRoleIcon">👑</span>
+          <span id="activeRoleLabel">Yönetici</span>
+        </button>
+
+        <button id="btnThemeToggle" onclick="toggleTheme()" class="btn btn-outline btn-sm" title="Açık / Koyu Kurumsal Tema">
+          <span id="themeIcon">🌙</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Masaüstü Sekmeler -->
+    <nav class="desktop-nav" aria-label="Ana Menü">
+      <button id="dTab_calc" onclick="switchTab('calc')" class="nav-btn active">
+        <span>⚡ Hesap & Fiyat</span>
+      </button>
+      <button id="dTab_quote" onclick="switchTab('quote')" class="nav-btn">
+        <span>📋 Teklif & Sipariş</span>
+        <span id="dBadgeQuote" class="nav-badge mono">0</span>
+      </button>
+      <button id="dTab_slit" onclick="switchTab('slit')" class="nav-btn">
+        <span>✂️ Algoritmik Dilme</span>
+        <span id="dBadgeSlit" class="nav-badge mono">0</span>
+      </button>
+      <button id="dTab_files" onclick="switchTab('files')" class="nav-btn">
+        <span>📂 Dosya & 45 Kalıp Tablosu</span>
+      </button>
+      <button id="dTab_admin" onclick="switchTab('admin')" class="nav-btn">
+        <span>⚙️ Yönetim Paneli</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- ==================== ANA İÇERİK ==================== -->
+  <main class="main-wrap">
+
+    <!-- ========================================================== -->
+    <!-- SEKME 1: TEK ARAMA PROFİL + AĞIRLIK + ÇİFT YÖNLÜ FİYAT     -->
+    <!-- ========================================================== -->
+    <section id="view_calc" class="stack">
+
+      <!-- TEK ARAMA AKILLI KUTU & PROFİL BULUCU -->
+      <div class="card" style="padding:12px 14px;">
+        <div class="row-between" style="margin-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span class="badge badge-blue">AKILLI TEK ARAMA</span>
+            <span style="font-size:0.78rem;color:var(--text-muted);font-weight:600;">Ölçü yazın, kutu/boru, kalıp, et ve bant otomatik seçilsin</span>
+          </div>
+          <div class="row-wrap">
+            <button onclick="toggleCatalogCollapse()" id="btnToggleCatalog" class="btn btn-outline btn-sm">Kalıp Listesini Gizle</button>
+            <button onclick="enableCustomMode()" id="btnCustomMode" class="btn btn-outline btn-sm">📐 Serbest Özel Ölçü</button>
+          </div>
+        </div>
+
+        <div class="omni-box" id="omniContainer">
+          <div class="omni-input-row">
+            <span style="font-size:1.1rem;color:var(--primary);padding-left:4px;">🔍</span>
+            <input
+              type="text"
+              id="omniSearchInput"
+              class="omni-input"
+              autocomplete="off"
+              placeholder="Tek aramada bul: 40x20x1.5, 80*40*3, 60,3 boru 2, 114x4, 150x100x4..."
+              oninput="onOmniSearchInput(this.value)"
+              onkeydown="onOmniSearchKeydown(event)"
+              onfocus="onOmniSearchFocus()"
+            >
+            <button id="btnClearOmni" onclick="clearOmniSearch()" class="btn btn-outline btn-sm hidden" title="Aramayı Temizle">✕</button>
+          </div>
+          <div id="omniDropdown" class="omni-dropdown hidden"></div>
+        </div>
+
+        <!-- Hızlı Hat ve Tip Filtre Çipleri -->
+        <div id="catalogCollapsible" style="margin-top:10px;">
+          <div class="h-scroll" style="margin-bottom:8px;">
+            <button id="fltLine_ALL" onclick="setCatalogFilter('ALL', null)" class="chip active">Tümü (<span id="lblTotalMoldCount">45</span>)</button>
+            <button id="fltLine_63" onclick="setCatalogFilter('63', null)" class="chip">63 Hat (≤2.9mm)</button>
+            <button id="fltLine_140" onclick="setCatalogFilter('140', null)" class="chip">140 Hat (Kalın)</button>
+            <button id="fltType_Kutu" onclick="setCatalogFilter(null, 'Kutu')" class="chip">⬜ Kutu & Kare</button>
+            <button id="fltType_Boru" onclick="setCatalogFilter(null, 'Boru')" class="chip">⭕ Boru</button>
+          </div>
+          <div id="moldCatalogGrid" class="mold-grid"></div>
+        </div>
+      </div>
+
+      <!-- ANA HESAPLAMA VE FİYATLANDIRMA 2 SÜTUN -->
+      <div class="grid-main">
+
+        <!-- SOL SÜTUN: SEÇİLİ PROFİL, KESİT, ET/BANT VE BAĞ MİKTARI -->
+        <div class="card stack">
+          <div class="card-header" style="margin-bottom:4px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <h2 id="selectedProfileTitle" class="card-title" style="font-size:1.05rem;">40x20 Kutu • 38Ø Kalıp</h2>
+                <span id="smartLineBadge" class="badge badge-blue">63 HAT UYGUN</span>
+                <span id="stripSourceBadge" class="badge badge-amber">Tablo Değeri</span>
+              </div>
+              <p id="selectedProfileMeta" style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">Fabrika bant genişliği ve kantar ağırlığı senkronize</p>
+            </div>
+            <div class="row-wrap">
+              <select id="selectCalcMethod" onchange="onCalcMethodChange()" class="btn btn-outline btn-sm" title="Ağırlık Hesaplama Algoritması">
+                <option value="strip">Yöntem: Fabrika Bant</option>
+                <option value="en10219">Yöntem: EN 10219 Kesit</option>
+              </select>
+              <select id="selectMaterial" onchange="onMaterialChange()" class="btn btn-outline btn-sm" title="Malzeme Yoğunluğu">
+                <option value="7.85">S235JR Çelik (7.85)</option>
+                <option value="7.85_galv">Galvaniz Sac (7.85)</option>
+                <option value="7.93">Paslanmaz 304 (7.93)</option>
+                <option value="2.70">Alüminyum (2.70)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Fabrika Kalıp Notu / Hat Uyarısı -->
+          <div id="moldNoteBanner" class="hidden" style="background:var(--amber-soft);border:1px solid var(--amber-border);color:var(--amber);padding:9px 12px;border-radius:9px;font-size:0.8rem;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <span id="moldNoteText">Uyarı</span>
+            <button id="btnSwitch140Suggestion" onclick="switchTo140Equivalent()" class="btn btn-amber btn-sm hidden">140 Hat Kalıbına Geç →</button>
+          </div>
+
+          <!-- Serbest / Özel Kesit Boyutları Paneli -->
+          <div id="customDimensionsPanel" class="hidden" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:10px;">
+            <div class="row-between" style="margin-bottom:8px;">
+              <span style="font-size:0.76rem;font-weight:800;color:var(--primary);">📐 ÖZEL KESİT ÖLÇÜLERİ (ALGORİTMİK BANT & KESİT)</span>
+              <div class="h-scroll">
+                <button onclick="setCustomShape('box')" id="shp_box" class="chip active">Kutu</button>
+                <button onclick="setCustomShape('square')" id="shp_square" class="chip">Kare</button>
+                <button onclick="setCustomShape('pipe')" id="shp_pipe" class="chip">Boru</button>
+                <button onclick="setCustomShape('sheet')" id="shp_sheet" class="chip">Sac/Plaka</button>
+                <button onclick="setCustomShape('roundbar')" id="shp_roundbar" class="chip">Dolu Mil</button>
+                <button onclick="setCustomShape('angle')" id="shp_angle" class="chip">Köşebent</button>
+              </div>
+            </div>
+            <div class="grid-2">
+              <div class="field" id="wrapCustomA">
+                <label id="lblCustomA" class="field-label">Kenar A / Dış Çap (mm)</label>
+                <input type="number" id="inputDimA" value="40" step="any" min="1" inputmode="decimal" oninput="onCustomDimInput()" class="field-input mono">
+              </div>
+              <div class="field" id="wrapCustomB">
+                <label id="lblCustomB" class="field-label">Kenar B (mm)</label>
+                <input type="number" id="inputDimB" value="20" step="any" min="1" inputmode="decimal" oninput="onCustomDimInput()" class="field-input mono">
+              </div>
+            </div>
+          </div>
+
+          <!-- Et Kalınlığı & Otomatik Bant Butonları -->
+          <div>
+            <div class="row-between" style="margin-bottom:6px;">
+              <span style="font-size:0.76rem;font-weight:800;color:var(--text-secondary);">ET KALINLIĞI → OTOMATİK BANT GENİŞLİĞİ SEÇİMİ</span>
+              <span style="font-size:0.72rem;color:var(--text-muted);">Ara kalınlıklarda algoritmik interpolasyon yapılır</span>
+            </div>
+            <div id="wallButtonsGrid" class="wall-grid"></div>
+            <div style="margin-top:7px;" class="h-scroll" id="tosyaliPillsRow">
+              <span class="badge badge-neutral" style="flex-shrink:0;">LAC S235JR Ara Kalınlıklar:</span>
+              <button type="button" onclick="setIntermediateWall(0.9)" class="chip" style="padding:3px 8px;font-size:0.72rem;">0.9</button>
+              <button type="button" onclick="setIntermediateWall(1.2)" class="chip" style="padding:3px 8px;font-size:0.72rem;">1.2</button>
+              <button type="button" onclick="setIntermediateWall(1.3)" class="chip" style="padding:3px 8px;font-size:0.72rem;">1.3 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(1.6)" class="chip" style="padding:3px 8px;font-size:0.72rem;">1.6 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(1.8)" class="chip" style="padding:3px 8px;font-size:0.72rem;">1.8 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(2.2)" class="chip" style="padding:3px 8px;font-size:0.72rem;">2.2 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(2.3)" class="chip" style="padding:3px 8px;font-size:0.72rem;">2.3</button>
+              <button type="button" onclick="setIntermediateWall(2.6)" class="chip" style="padding:3px 8px;font-size:0.72rem;">2.6</button>
+              <button type="button" onclick="setIntermediateWall(2.7)" class="chip" style="padding:3px 8px;font-size:0.72rem;">2.7 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(2.8)" class="chip" style="padding:3px 8px;font-size:0.72rem;">2.8 ⭐</button>
+              <button type="button" onclick="setIntermediateWall(3.2)" class="chip" style="padding:3px 8px;font-size:0.72rem;">3.2</button>
+              <button type="button" onclick="setIntermediateWall(3.7)" class="chip" style="padding:3px 8px;font-size:0.72rem;">3.7</button>
+            </div>
+          </div>
+
+          <!-- 4 Ana Teknik Giriş Kutusu -->
+          <div class="grid-4">
+            <div class="field primary">
+              <label class="field-label">
+                <span>Et Kalınlığı</span>
+                <span>mm</span>
+              </label>
+              <input type="number" id="inputWall" value="1.5" step="0.1" min="0.3" inputmode="decimal" oninput="onWallManualInput()" class="field-input lg mono text-primary">
+            </div>
+
+            <div class="field amber">
+              <label class="field-label">
+                <span>Bant Eni</span>
+                <span>mm</span>
+              </label>
+              <input type="number" id="inputStripWidth" value="117" step="0.5" min="5" inputmode="decimal" oninput="onStripManualInput()" class="field-input lg mono text-amber">
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span>Profil Boyu (m)</span>
+                <span id="quickLengthChips" style="display:inline-flex;gap:3px;"></span>
+              </div>
+              <input type="number" id="inputLength" value="6" step="0.5" min="0.1" inputmode="decimal" oninput="recalculateMain()" class="field-input lg mono">
+            </div>
+
+            <div class="field">
+              <label class="field-label">
+                <span>1 Bağ Adedi</span>
+                <span>Boy</span>
+              </label>
+              <input type="number" id="inputPcsPerBundle" value="60" step="1" min="1" inputmode="numeric" oninput="onPcsPerBundleInput()" class="field-input lg mono">
+            </div>
+          </div>
+
+          <!-- Bağ, Adet ve Hedef Tonaj Algoritmik Miktar Bölümü -->
+          <div style="border-top:1px solid var(--border);padding-top:12px;">
+            <div class="row-between" style="margin-bottom:8px;">
+              <span style="font-size:0.76rem;font-weight:800;color:var(--text-secondary);">MİKTAR, BAĞ (COLISAGE) & HEDEF TONAJ ÇÖZÜCÜ</span>
+              <div id="quickBundleChips" class="row-wrap"></div>
+            </div>
+
+            <div class="grid-3">
+              <div class="field">
+                <label class="field-label">Toplam Bağ (Paket)</label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+                  <input type="number" id="inputBundleCount" value="1" step="any" min="0" inputmode="decimal" oninput="onBundleCountInput()" class="field-input lg mono">
+                  <div class="stepper">
+                    <button onclick="stepBundles(-1)" class="step-btn" aria-label="Bağ Azalt">−</button>
+                    <button onclick="stepBundles(1)" class="step-btn" aria-label="Bağ Artır">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field primary">
+                <label class="field-label">Toplam Boy (Adet)</label>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+                  <input type="number" id="inputTotalPieces" value="60" step="1" min="1" inputmode="numeric" oninput="onTotalPiecesInput()" class="field-input lg mono text-primary">
+                  <div class="stepper">
+                    <button onclick="stepPieces(-1)" class="step-btn" aria-label="Boy Azalt">−</button>
+                    <button onclick="stepPieces(1)" class="step-btn" aria-label="Boy Artır">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field emerald">
+                <label class="field-label">
+                  <span>Hedef Tonaj</span>
+                  <span>Ton</span>
+                </label>
+                <input type="number" id="inputTargetTon" placeholder="Örn: 25" step="0.5" min="0.1" inputmode="decimal" oninput="onTargetTonInput(this.value)" class="field-input lg mono text-emerald" title="Hedef tonaj yazıldığında tam bağ ve boy sayısını otomatik çözer">
+              </div>
+            </div>
+
+            <div id="bundleSummaryStrip" style="margin-top:8px;padding:7px 10px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);font-size:0.78rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+              <span id="lblBundleBreakdown">📦 Paket: <b>1 Tam Bağ</b> (60 Boy)</span>
+              <span id="lblGeoCompare" class="mono text-muted">EN 10219 Kesit: 1.325 kg/m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SAĞ SÜTUN: CANLI KANTAR AĞIRLIĞI + KG & BOY ÇİFT YÖNLÜ FİYATLANDIRMA -->
+        <div class="stack">
+
+          <!-- KART A: CANLI AĞIRLIK & METRAJ KARTI -->
+          <div class="card">
+            <div class="card-header" style="margin-bottom:10px;padding-bottom:8px;">
+              <span class="card-title">⚖️ Ağırlık & Tonaj Sonuçları</span>
+              <span id="kpiActiveSpecBadge" class="badge badge-neutral mono">40x20x1.5 • 6m</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="kpi-box">
+                <div class="kpi-label">1 Metre Ağırlığı</div>
+                <div id="kpiKgPerMeter" class="kpi-val mono">1,378 kg/m</div>
+                <div id="kpiStripFormula" class="kpi-sub mono text-amber">117 mm × 1.5 mm</div>
+              </div>
+
+              <div class="kpi-box" style="border-color:var(--primary-border);">
+                <div class="kpi-label text-primary">1 Boy Ağırlığı</div>
+                <div id="kpiKgPerPiece" class="kpi-val mono text-primary">8,27 kg/Boy</div>
+                <div id="kpiLengthSub" class="kpi-sub text-muted">6 Metre / Boy</div>
+              </div>
+
+              <div class="kpi-box">
+                <div class="kpi-label">1 Bağ (Paket) Ağırlığı</div>
+                <div id="kpiKgPerBundle" class="kpi-val mono">495,96 kg</div>
+                <div id="kpiPcsPerBundleSub" class="kpi-sub text-muted">60 Boy / Bağ</div>
+              </div>
+
+              <div class="kpi-box" style="background:var(--emerald-soft);border-color:var(--emerald-border);">
+                <div class="kpi-label text-emerald">TOPLAM AĞIRLIK</div>
+                <div id="kpiTotalKg" class="kpi-val mono text-emerald">495,96 kg</div>
+                <div id="kpiTotalTonAndMeters" class="kpi-sub mono">0,50 Ton • 360 m</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KART B: ÇİFT YÖNLÜ FİYATLANDIRMA (KG BAZLI & BOY BAZLI) -->
+          <div id="pricingCard" class="card stack" style="gap:11px;">
+            <div class="row-between">
+              <span class="card-title">💰 KG & Boy Bazlı Fiyatlandırma</span>
+              <div class="row-wrap">
+                <select id="selectCurrency" onchange="onCurrencyChange()" class="btn btn-outline btn-sm mono">
+                  <option value="DA">DA (DZD)</option>
+                  <option value="₺">₺ (TRY)</option>
+                  <option value="$">$ (USD)</option>
+                  <option value="€">€ (EUR)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- KG vs BOY Hesaplama Modu Seçici -->
+            <div class="segmented" role="tablist" aria-label="Fiyatlandırma Bazı">
+              <button id="segBasis_KG" onclick="setPricingBasis('KG')" class="seg-btn active">⚖️ KG Bazlı Fiyatlandır</button>
+              <button id="segBasis_PIECE" onclick="setPricingBasis('PIECE')" class="seg-btn">📏 BOY (Adet) Bazlı Fiyatlandır</button>
+            </div>
+
+            <!-- Hızlı KG Fiyat Butonları -->
+            <div id="quickPriceChipsRow" class="h-scroll"></div>
+
+            <!-- Çift Yönlü KG ve BOY Birim Fiyat Kutuları -->
+            <div class="grid-2">
+              <div id="fieldWrapKgPrice" class="field emerald" style="border-width:2px;">
+                <label class="field-label">
+                  <span>1 KG Birim Fiyatı</span>
+                  <span id="lblCurrKg" class="mono">DA/kg</span>
+                </label>
+                <input type="number" id="inputKgPrice" value="145" step="0.5" min="0" inputmode="decimal" oninput="onKgPriceInput()" class="field-input lg mono text-emerald">
+                <div id="subTonPrice" style="font-size:0.71rem;color:var(--text-muted);margin-top:2px;" class="mono">1 Ton: 145.000 DA</div>
+              </div>
+
+              <div id="fieldWrapPiecePrice" class="field">
+                <label class="field-label">
+                  <span>1 BOY Satış Fiyatı</span>
+                  <span id="lblCurrPiece" class="mono">DA/Boy</span>
+                </label>
+                <input type="number" id="inputPiecePrice" value="1198.74" step="1" min="0" inputmode="decimal" oninput="onPiecePriceInput()" class="field-input lg mono text-primary">
+                <div id="subMeterPrice" style="font-size:0.71rem;color:var(--text-muted);margin-top:2px;" class="mono">1 Metre: 199,79 DA/m</div>
+              </div>
+            </div>
+
+            <!-- İskonto ve KDV / TVA Satırı -->
+            <div class="grid-2">
+              <div class="field">
+                <label class="field-label">
+                  <span>Kalem İskonto</span>
+                  <span>%</span>
+                </label>
+                <input type="number" id="inputDiscountPct" value="0" step="0.5" min="0" max="90" inputmode="decimal" oninput="onDiscountInput()" class="field-input mono">
+              </div>
+
+              <div class="field" style="display:flex;flex-direction:column;justify-content:space-between;">
+                <label class="field-label">Vergi (<span id="lblVatRateTag">%19 TVA</span>)</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+                  <button id="btnVatHT" onclick="setVatDisplayMode(false)" class="btn btn-primary btn-sm">HT (Hariç)</button>
+                  <button id="btnVatTTC" onclick="setVatDisplayMode(true)" class="btn btn-outline btn-sm">+KDV / TTC</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Taban Fiyat Uyarı Kutusu -->
+            <div id="floorPriceWarning" class="hidden" style="background:var(--danger-soft);border:1px solid var(--danger-border);color:var(--danger);padding:8px 10px;border-radius:8px;font-size:0.76rem;font-weight:700;"></div>
+
+            <!-- Yönetici Özel Canlı Kâr Marjı Satırı -->
+            <div id="adminProfitBox" class="hidden" style="background:var(--purple-soft);border:1px solid var(--purple-border);color:var(--purple);padding:8px 11px;border-radius:8px;font-size:0.76rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+              <span id="lblAdminMarginUnit">👑 Yönetici Kâr Analizi: —</span>
+              <strong id="lblAdminMarginTotal" class="mono">—</strong>
+            </div>
+
+            <!-- Canlı Toplam Fiyat Kutusu -->
+            <div style="background:var(--surface-alt);border:1px solid var(--border-strong);border-radius:10px;padding:12px;">
+              <div class="row-between" style="margin-bottom:4px;">
+                <span id="lblActiveTotalHeading" style="font-size:0.75rem;font-weight:800;color:var(--text-muted);">TOPLAM TUTAR (HT - VERGİ HARİÇ)</span>
+                <span id="badgeActivePricingMode" class="badge badge-emerald">KG BAZLI</span>
+              </div>
+              <div id="kpiGrandTotalMain" class="mono fw-800 text-emerald" style="font-size:1.55rem;line-height:1.2;">71.914,20 DA</div>
+              <div class="row-between" style="margin-top:6px;font-size:0.75rem;color:var(--text-secondary);">
+                <span id="kpiSecondaryVatLine" class="mono">TTC (%19 Dahil): 85.577,90 DA</span>
+                <span id="kpiBundlePriceLine" class="mono fw-800 text-amber">1 Bağ: 71.914,20 DA</span>
+              </div>
+            </div>
+
+            <!-- Aksiyon Butonları -->
+            <div class="stack" style="gap:8px;">
+              <button id="btnAddToQuoteMain" onclick="addCurrentToQuote()" class="btn btn-primary btn-lg w-full">
+                <span>➕ Siparişe / Teklif Listesine Ekle</span>
+              </button>
+              <div class="grid-2">
+                <button onclick="sendCurrentMoldToSlitter()" class="btn btn-outline">
+                  <span>✂️ Dilme Planına Gönder</span>
+                </button>
+                <button onclick="quickShareSingleCalc()" class="btn btn-emerald">
+                  <span>💬 Tek Kalem WhatsApp</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Operatör Modunda Fiyat Kapalıyken Gösterilecek Teknik Aksiyon Kartı -->
+          <div id="operatorOnlyActionsCard" class="card hidden">
+            <button onclick="sendCurrentMoldToSlitter()" class="btn btn-amber btn-lg w-full">
+              <span>✂️ Bu Profil Bandını Dilme Planlayıcıya Gönder</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SEKME 2: MÜŞTERİ TEKLİF & SİPARİŞ MERKEZİ (DEVIS)          -->
+    <!-- ========================================================== -->
+    <section id="view_quote" class="stack hidden">
+      <div class="grid-main">
+
+        <!-- Sol: Müşteri Bilgileri & Teklif Kalemleri -->
+        <div class="card stack">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📋 Müşteri Teklif & Sipariş Listesi (Devis)</h2>
+              <p style="font-size:0.76rem;color:var(--text-muted);">KG bazlı ve Boy bazlı kalemleri bir arada düzenleyin, Excel veya PDF çıktı alın</p>
+            </div>
+            <div class="row-wrap">
+              <button onclick="switchTab('calc')" class="btn btn-primary btn-sm">+ Yeni Kalem Ekle</button>
+              <button onclick="clearQuoteItems()" class="btn btn-danger btn-sm">Listeyi Temizle</button>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field">
+              <label class="field-label">Müşteri / Firma (Client)</label>
+              <input type="text" id="quoteCustName" oninput="saveAppState()" placeholder="Örn: SARL Metal Oran / Yılmaz Çelik" class="field-input" style="font-weight:700;">
+            </div>
+            <div class="field">
+              <label class="field-label">Bölge / Wilaya / Sevk</label>
+              <input type="text" id="quoteCustLocation" oninput="saveAppState()" placeholder="Örn: Alger / Fabrika Teslim" class="field-input" style="font-weight:700;">
+            </div>
+            <div class="field">
+              <label class="field-label">Telefon / Referans Notu</label>
+              <input type="text" id="quoteCustPhone" oninput="saveAppState()" placeholder="Örn: +213 ... / Peşin" class="field-input" style="font-weight:700;">
+            </div>
+          </div>
+
+          <div id="quoteItemsList" class="stack" style="gap:8px;"></div>
+        </div>
+
+        <!-- Sağ: Finansal Özet, Çıktı ve Kayıtlı Teklifler -->
+        <div class="stack">
+          <div class="card stack">
+            <div class="card-header" style="margin-bottom:4px;">
+              <span class="card-title">📊 Teklif Genel Toplamı</span>
+              <span id="quoteNoBadge" class="badge badge-blue mono">DEVIS</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label class="field-label">Genel İskonto (%)</label>
+                <input type="number" id="quoteGlobalDiscount" value="0" step="0.5" min="0" max="50" inputmode="decimal" oninput="renderQuoteView()" class="field-input mono">
+              </div>
+              <div class="field">
+                <label class="field-label">KDV / TVA Oranı (%)</label>
+                <input type="number" id="quoteVatRate" value="19" step="1" min="0" max="50" inputmode="decimal" oninput="onQuoteVatInput()" class="field-input mono">
+              </div>
+            </div>
+
+            <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:12px;" class="stack">
+              <div class="row-between" style="font-size:0.8rem;">
+                <span class="text-muted">Toplam Kalem / Bağ / Boy:</span>
+                <strong id="qSumQty" class="mono">0 Kalem (0 Bağ / 0 Boy)</strong>
+              </div>
+              <div class="row-between" style="font-size:0.8rem;">
+                <span class="text-muted">Toplam Uzunluk (Metraj):</span>
+                <strong id="qSumMeters" class="mono">0 m</strong>
+              </div>
+              <div class="row-between" style="font-size:0.86rem;">
+                <span class="text-muted">Toplam Kantar Tonajı:</span>
+                <strong id="qSumWeight" class="mono text-amber">0,00 kg (0,00 Ton)</strong>
+              </div>
+              <div style="border-top:1px solid var(--border);padding-top:8px;" class="row-between">
+                <span style="font-size:0.82rem;font-weight:700;">Ara Toplam (HT):</span>
+                <strong id="qSumHT" class="mono">0,00 DA</strong>
+              </div>
+              <div id="qRowDiscount" class="row-between hidden" style="font-size:0.8rem;color:var(--danger);">
+                <span>İskonto Tutarı:</span>
+                <strong id="qSumDiscount" class="mono">-0,00 DA</strong>
+              </div>
+              <div class="row-between" style="font-size:0.8rem;">
+                <span id="qLblVat">Vergi / TVA (%19):</span>
+                <strong id="qSumVat" class="mono">0,00 DA</strong>
+              </div>
+              <div style="border-top:1px solid var(--border-strong);padding-top:8px;" class="row-between">
+                <span style="font-size:0.9rem;font-weight:800;" class="text-emerald">GENEL TOPLAM (TTC):</span>
+                <strong id="qSumTTC" class="mono text-emerald" style="font-size:1.35rem;">0,00 DA</strong>
+              </div>
+              <div id="qMultiCurrencyHint" class="mono text-muted" style="font-size:0.72rem;text-align:right;"></div>
+            </div>
+
+            <div class="grid-2">
+              <button onclick="shareQuoteWhatsApp('TR')" class="btn btn-emerald">💬 WhatsApp (TR)</button>
+              <button onclick="shareQuoteWhatsApp('FR')" class="btn btn-emerald">🇩🇿 WhatsApp (FR/DZ)</button>
+              <button onclick="exportQuoteExcel()" class="btn btn-primary">📊 Excel (.xlsx) İndir</button>
+              <button onclick="printFormalQuote()" class="btn btn-outline">🖨️ Kurumsal PDF / Yazdır</button>
+              <button onclick="copyQuoteClipboard()" class="btn btn-outline">📋 Metni Kopyala</button>
+              <button onclick="archiveCurrentQuote()" class="btn btn-amber">💾 Teklifi Arşivle</button>
+            </div>
+          </div>
+
+          <!-- Kayıtlı Teklifler Arşivi (Çevrimdışı) -->
+          <div class="card">
+            <div class="card-header" style="margin-bottom:8px;padding-bottom:8px;">
+              <span class="card-title">🗂️ Kayıtlı Teklif Geçmişi (Çevrimdışı)</span>
+              <span id="savedQuotesCount" class="badge badge-neutral mono">0</span>
+            </div>
+            <div id="savedQuotesList" class="stack" style="gap:7px;max-height:230px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SEKME 3: ALGORİTMİK ÇOKLU DİLME & BOBİN OPTİMİZASYONU       -->
+    <!-- ========================================================== -->
+    <section id="view_slit" class="stack hidden">
+
+      <!-- Bobin Ana Giriş Parametreleri -->
+      <div class="card stack">
+        <div class="card-header" style="margin-bottom:4px;">
+          <div>
+            <h2 class="card-title">✂️ Algoritmik Çoklu Bant Dilme & Kütle Dengesi Sistemi</h2>
+            <p style="font-size:0.76rem;color:var(--text-muted);">Dinamik programlama algoritması ile rulo genişliğine en yüksek verimli (%99+) çoklu bant reçetelerini otomatik bulur</p>
+          </div>
+          <span id="slitLineRecommendationBadge" class="badge badge-blue">63 HAT ÖNERİLDİ</span>
+        </div>
+
+        <div class="grid-4">
+          <div class="field">
+            <div class="field-label">
+              <span>1. Rulo Eni (mm)</span>
+              <span id="slitStandardCoilChips" style="display:inline-flex;gap:3px;flex-wrap:wrap;"></span>
+            </div>
+            <input type="number" id="slitCoilWidth" value="1250" step="1" min="100" inputmode="decimal" oninput="renderSlitWorkspace()" class="field-input lg mono">
+          </div>
+
+          <div class="field emerald">
+            <div class="field-label">
+              <span>2. Rulo Ağırlığı (KG)</span>
+              <span style="display:inline-flex;gap:3px;">
+                <button onclick="setSlitCoilKg(5000)" class="badge badge-emerald">5T</button>
+                <button onclick="setSlitCoilKg(10000)" class="badge badge-emerald">10T</button>
+                <button onclick="setSlitCoilKg(12800)" class="badge badge-emerald">12.8T</button>
+                <button onclick="setSlitCoilKg(20000)" class="badge badge-emerald">20T</button>
+              </span>
+            </div>
+            <input type="number" id="slitCoilKg" value="10000" step="100" min="50" inputmode="decimal" oninput="renderSlitWorkspace()" class="field-input lg mono text-emerald">
+          </div>
+
+          <div class="field primary">
+            <label class="field-label">
+              <span>3. Sac Kalınlığı</span>
+              <span>mm</span>
+            </label>
+            <input type="number" id="slitThickness" value="2.0" step="0.1" min="0.4" max="12" inputmode="decimal" oninput="onSlitThicknessInput()" class="field-input lg mono text-primary">
+          </div>
+
+          <div class="grid-2" style="gap:6px;">
+            <div class="field">
+              <label class="field-label" title="İki kenardan kesilen toplam tıraş firesi">Kenar Payı</label>
+              <input type="number" id="slitTrimMm" value="0" step="1" min="0" max="60" inputmode="decimal" oninput="renderSlitWorkspace()" class="field-input lg mono">
+            </div>
+            <div class="field">
+              <label class="field-label" title="Dilim başı bıçak kesim kaybı">Bıçak Payı</label>
+              <input type="number" id="slitKerfMm" value="0" step="0.1" min="0" max="5" inputmode="decimal" oninput="renderSlitWorkspace()" class="field-input lg mono">
+            </div>
+          </div>
+        </div>
+
+        <div class="row-between" style="padding-top:4px;">
+          <div class="h-scroll">
+            <button onclick="setSlitThicknessQuick(1.2)" class="chip">1.2 mm</button>
+            <button onclick="setSlitThicknessQuick(1.5)" class="chip">1.5 mm</button>
+            <button onclick="setSlitThicknessQuick(2.0)" class="chip">2.0 mm</button>
+            <button onclick="setSlitThicknessQuick(2.5)" class="chip">2.5 mm</button>
+            <button onclick="setSlitThicknessQuick(2.9)" class="chip">2.9 mm (63H Max)</button>
+            <button onclick="setSlitThicknessQuick(3.0)" class="chip">3.0 mm (140H)</button>
+            <button onclick="setSlitThicknessQuick(3.7)" class="chip">3.7 mm (140H)</button>
+            <button onclick="setSlitThicknessQuick(4.0)" class="chip">4.0 mm (140H)</button>
+            <button onclick="setSlitThicknessQuick(5.0)" class="chip">5.0 mm (140H)</button>
+          </div>
+          <span id="slitCoilMetricsBadge" class="badge badge-neutral mono">Rulo Metrajı: ~509 m | 1 mm = 8,00 kg</span>
+        </div>
+      </div>
+
+      <!-- Dilme Planı & Kütle Dengesi 2 Sütun -->
+      <div class="grid-main grid-slit">
+
+        <!-- Sol: Bant Ekleme, Görsel Şema ve Dilim Tablosu -->
+        <div class="card stack">
+          <div class="row-between">
+            <h3 class="card-title">📐 Rulo İçi Çoklu Bant Yerleşimi</h3>
+            <div class="row-wrap">
+              <button onclick="autoOptimizeCurrentCoil()" class="btn btn-primary btn-sm">🧠 Otomatik Minimum Fire Planla</button>
+              <button onclick="exportSlitExcel()" class="btn btn-emerald btn-sm">📊 Dilme İş Emri (.xlsx)</button>
+              <button onclick="printSlitWorkOrder()" class="btn btn-outline btn-sm">🖨️ İş Emri Yazdır</button>
+              <button onclick="clearSlitItems()" class="btn btn-danger btn-sm">Sıfırla</button>
+            </div>
+          </div>
+
+          <!-- Manuel / Kalıptan Bant Ekleme Çubuğu -->
+          <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;align-items:end;">
+            <div style="grid-column:span 2;">
+              <label class="field-label">Kalıp / Profil Seçin</label>
+              <select id="slitMoldSelect" onchange="onSlitMoldSelectChange()" class="field-input" style="background:var(--surface);border:1px solid var(--border);padding:7px 9px;border-radius:7px;font-size:0.84rem;font-weight:700;"></select>
+            </div>
+            <div>
+              <label class="field-label text-amber">Bant Eni (mm)</label>
+              <input type="number" id="slitBandWidthInput" value="116" step="0.5" min="15" inputmode="decimal" class="field-input mono text-amber" style="background:var(--surface);border:1px solid var(--amber-border);padding:7px 9px;border-radius:7px;">
+            </div>
+            <div>
+              <label class="field-label">Dilim Adedi</label>
+              <input type="number" id="slitBandCountInput" value="2" step="1" min="1" max="40" inputmode="numeric" class="field-input mono" style="background:var(--surface);border:1px solid var(--border);padding:7px 9px;border-radius:7px;">
+            </div>
+            <button onclick="addBandToSlit()" class="btn btn-primary" style="height:38px;">+ Ruloya Ekle</button>
+          </div>
+
+          <!-- Görsel Rulo Kesit Şeması -->
+          <div>
+            <div class="row-between" style="font-size:0.78rem;font-weight:700;margin-bottom:5px;">
+              <span id="slitVisualTitle">1250 mm Rulo Kesit Dağılımı</span>
+              <span id="slitVisualStatus" class="mono text-emerald">Kullanılan: 0 mm | Kalan: 1250 mm</span>
+            </div>
+            <div id="slitVisualBar" class="slit-bar"></div>
+          </div>
+
+          <!-- Eklenen Bantlar Tablosu -->
+          <div class="table-wrap">
+            <table class="corp-table">
+              <thead>
+                <tr>
+                  <th>Sıra / Profil</th>
+                  <th class="text-center">Bant (mm)</th>
+                  <th class="text-center">Dilim</th>
+                  <th class="text-right">Toplam En</th>
+                  <th class="text-right">1 Bant Kg</th>
+                  <th class="text-right">Toplam Kg (Pay)</th>
+                  <th class="text-right">Çıkan 6m Boy / Bağ</th>
+                  <th class="text-center">İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="slitTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sağ: Kütle Dengesi + Kalan Boşluk Tamamlayıcı + DP Önerileri -->
+        <div class="stack">
+          <div class="card stack" style="gap:10px;">
+            <div class="row-between">
+              <span class="card-title">⚖️ Kütle Dengesi & Fire Analizi</span>
+              <span id="slitYieldBadge" class="badge badge-emerald mono">Verim: %92,80</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="kpi-box">
+                <div class="kpi-label">Giren Rulo</div>
+                <div id="slitKpiCoilKg" class="kpi-val mono">10.000 kg</div>
+                <div id="slitKpiCoilMm" class="kpi-sub mono text-muted">1250 mm En</div>
+              </div>
+              <div class="kpi-box" style="background:var(--emerald-soft);border-color:var(--emerald-border);">
+                <div class="kpi-label text-emerald">Net Bant Üretimi</div>
+                <div id="slitKpiUsedKg" class="kpi-val mono text-emerald">9.280 kg</div>
+                <div id="slitKpiUsedMm" class="kpi-sub mono">1160 mm Ürün</div>
+              </div>
+              <div class="kpi-box">
+                <div class="kpi-label">Kalan Boşluk</div>
+                <div id="slitKpiRemMm" class="kpi-val mono text-amber">90 mm</div>
+                <div id="slitKpiRemKg" class="kpi-sub mono text-muted">720 kg Artan</div>
+              </div>
+              <div class="kpi-box" style="background:var(--danger-soft);border-color:var(--danger-border);">
+                <div class="kpi-label text-danger">Toplam Fire</div>
+                <div id="slitKpiScrapKg" class="kpi-val mono text-danger">720 kg</div>
+                <div id="slitKpiScrapPct" class="kpi-sub mono">%7,20 Kayıp</div>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:0.76rem;font-weight:800;margin-bottom:6px;color:var(--text-secondary);">✨ KALAN BOŞLUĞA SIĞAN TAMAMLAYICI BANTLAR</div>
+              <div id="slitFillerList" class="stack" style="gap:6px;max-height:210px;overflow-y:auto;"></div>
+            </div>
+          </div>
+
+          <!-- Algoritmik En İyi Çoklu Kombinasyon Reçeteleri -->
+          <div class="card stack" style="gap:8px;">
+            <div class="row-between">
+              <span class="card-title">🧠 Algoritmik Minimum Fire Reçeteleri</span>
+              <span class="badge badge-blue">DP Solver</span>
+            </div>
+            <p style="font-size:0.74rem;color:var(--text-muted);">Seçili rulo ve kalınlık için 2'li / 3'lü farklı bant kombinasyonlarıyla en düşük fireli kesim planları:</p>
+            <div id="slitOptimalRecipesBox" class="stack" style="gap:7px;max-height:280px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Standart Bobinler Kıyaslama Kartları -->
+      <div class="card stack">
+        <div class="card-header" style="margin-bottom:4px;">
+          <h3 class="card-title">📊 Standart Bobin Genişlikleri Algoritmik Verim Kıyaslaması</h3>
+          <span style="font-size:0.75rem;color:var(--text-muted);">Seçili ana bant için en uygun rulo genişliğini tek tıkla planlayın</span>
+        </div>
+        <div id="slitStandardCoilsGrid" class="grid-3"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SEKME 4: DOSYA YÜKLEME (EXCEL/CSV/PDF) & 45 KALIP MATRİSİ  -->
+    <!-- ========================================================== -->
+    <section id="view_files" class="stack hidden">
+
+      <div class="grid-main">
+        <!-- Sol: Akıllı Dosya Yükleme & Otomatik Veri Aktarımı -->
+        <div class="card stack">
+          <div class="card-header" style="margin-bottom:4px;">
+            <div>
+              <h2 class="card-title">📂 Akıllı Dosya Yükleme & Çevrimdışı Veri Merkezi</h2>
+              <p style="font-size:0.76rem;color:var(--text-muted);">Kalıp Listesi (.xlsx), Sipariş Listesi (.xlsx/.csv), Dilme Programı (.xlsx) veya Referans PDF/Görsel yükleyin</p>
+            </div>
+            <span class="badge badge-emerald">Offline IndexedDB</span>
+          </div>
+
+          <label for="fileUploadInput" id="fileDropzone" class="dropzone">
+            <div style="font-size:2rem;margin-bottom:6px;">📥</div>
+            <div style="font-size:0.92rem;font-weight:800;color:var(--text);">Dosya Seçmek İçin Tıklayın veya Buraya Sürükleyin</div>
+            <div style="font-size:0.76rem;color:var(--text-muted);margin-top:4px;">Desteklenen: Excel (.xlsx, .xls), CSV, JSON Yedek, PDF, Görsel (.png, .jpg)</div>
+            <input type="file" id="fileUploadInput" accept=".xlsx,.xls,.csv,.json,.pdf,.png,.jpg,.jpeg" onchange="handleFileUpload(event)" class="hidden">
+          </label>
+
+          <!-- Yüklenen Dosya Önizleme & İşlem Kutusu -->
+          <div id="uploadedFilePreviewBox" class="hidden" style="background:var(--primary-soft);border:1px solid var(--primary-border);border-radius:10px;padding:12px;"></div>
+
+          <!-- Hazır Excel Şablonları ve Dışa Aktarım -->
+          <div class="row-between" style="border-top:1px solid var(--border);padding-top:10px;">
+            <span style="font-size:0.76rem;font-weight:800;color:var(--text-secondary);">HAZIR ŞABLON & VERİ DIŞA AKTARIM:</span>
+            <div class="row-wrap">
+              <button onclick="downloadMoldDatabaseExcel()" class="btn btn-outline btn-sm">📊 Kalıp Listesi (.xlsx) İndir</button>
+              <button onclick="downloadSampleOrderExcel()" class="btn btn-outline btn-sm">📋 Örnek Sipariş Şablonu (.xlsx)</button>
+              <button onclick="exportFullSystemBackupJson()" class="btn btn-outline btn-sm">💾 Tam Sistem Yedeği (.json)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sağ: Çevrimdışı Dosya Kasası (IndexedDB) -->
+        <div class="card stack">
+          <div class="card-header" style="margin-bottom:4px;">
+            <span class="card-title">🗄️ Çevrimdışı Yüklenen Dosyalar Kasası</span>
+            <span id="vaultFilesCount" class="badge badge-neutral mono">0 Dosya</span>
+          </div>
+          <p style="font-size:0.75rem;color:var(--text-muted);">Yüklediğiniz dosyalar tarayıcı veritabanına kaydedilir; internet yokken bile açabilir, yeniden içe aktarabilir veya indirebilirsiniz.</p>
+          <div id="vaultFilesList" class="stack" style="gap:8px;max-height:260px;overflow-y:auto;"></div>
+        </div>
+      </div>
+
+      <!-- TAM 45 KALIP & BANT GENİŞLİĞİ ETKİLEŞİMLİ REFERANS TABLOSU -->
+      <div class="card stack">
+        <div class="card-header" style="margin-bottom:4px;">
+          <div>
+            <h3 class="card-title">📑 63 Hat & 140 Hat Tam Kalıp ve Bant Genişliği Matrisi</h3>
+            <p style="font-size:0.76rem;color:var(--text-muted);">Tablodaki herhangi bir bant genişliği hücresine tıklayarak o kalıbı ve kalınlığı anında hesaplamaya yükleyin</p>
+          </div>
+        </div>
+        <div id="fullMatrixTablesContainer" class="stack"></div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- SEKME 5: YÖNETİCİ TAM KONTROL MERKEZİ (ADMIN RBAC)         -->
+    <!-- ========================================================== -->
+    <section id="view_admin" class="stack hidden">
+
+      <div class="card" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#fff;border:none;">
+        <div class="row-between">
+          <div>
+            <span class="badge" style="background:rgba(255,255,255,0.2);color:#fff;margin-bottom:4px;">👑 TAM YETKİLİ YÖNETİCİ PANELİ</span>
+            <h2 style="font-size:1.15rem;font-weight:800;">Sistem, Algoritma, Fiyat, Kalıp ve Rol Yönetimi</h2>
+            <p style="font-size:0.78rem;opacity:0.85;">Yaptığınız tüm ayarlar anında tüm hesaplama motoruna uygulanır ve çevrimdışı hafızaya kaydedilir.</p>
+          </div>
+          <div class="row-wrap">
+            <button onclick="saveAdminSettingsFromForm()" class="btn btn-emerald">💾 Tüm Ayarları Kaydet & Uygula</button>
+            <button onclick="resetFactoryDefaultsConfirm()" class="btn btn-danger btn-sm">Fabrika Ayarlarına Dön</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Alt Sekmeleri -->
+      <div class="h-scroll">
+        <button id="admSub_general" onclick="switchAdminSubTab('general')" class="chip active">🏢 1. Kurumsal & Mühendislik</button>
+        <button id="admSub_pricing" onclick="switchAdminSubTab('pricing')" class="chip">💰 2. Fiyat, Vergi, Döviz & Maliyet</button>
+        <button id="admSub_molds" onclick="switchAdminSubTab('molds')" class="chip">🔩 3. Kalıp & Bant Veritabanı (CRUD)</button>
+        <button id="admSub_roles" onclick="switchAdminSubTab('roles')" class="chip">🔐 4. Kullanıcılar & Rol Yetkileri</button>
+      </div>
+
+      <!-- ADMIN ALT PANEL 1: KURUMSAL KİMLİK, ALGORİTMA & DİLME AYARLARI -->
+      <div id="admPanel_general" class="grid-main">
+        <div class="card stack">
+          <h3 class="card-title">🏢 Kurumsal Kimlik & Teklif Başlığı</h3>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Uygulama / Marka Başlığı</label>
+              <input type="text" id="admBrandName" class="field-input">
+            </div>
+            <div class="field">
+              <label class="field-label">Logo Kısa Kodu (2-3 Harf)</label>
+              <input type="text" id="admBrandCode" maxlength="4" class="field-input mono">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Alt Başlık / Slogan</label>
+            <input type="text" id="admBrandSub" class="field-input">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Resmi Şirket Ünvanı (PDF/Devis)</label>
+              <input type="text" id="admCompanyLegal" class="field-input">
+            </div>
+            <div class="field">
+              <label class="field-label">Telefon & İletişim</label>
+              <input type="text" id="admCompanyPhone" class="field-input">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Adres / Fabrika / Wilaya</label>
+              <input type="text" id="admCompanyAddress" class="field-input">
+            </div>
+            <div class="field">
+              <label class="field-label">Vergi / RC / NIF Numarası</label>
+              <input type="text" id="admCompanyTaxId" class="field-input mono">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Teklif Alt Notu (Geçerlilik / Teslimat Şartı)</label>
+            <input type="text" id="admQuoteFooter" class="field-input">
+          </div>
+        </div>
+
+        <div class="card stack">
+          <h3 class="card-title">⚙️ Mühendislik, Hat & Dilme Sabitleri</h3>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Varsayılan Çelik Yoğunluğu (g/cm³)</label>
+              <input type="number" id="admDefaultDensity" step="0.01" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">63 Hat Maksimum Kalınlık (mm)</label>
+              <input type="number" id="admMax63Wall" step="0.1" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Bant İnterpolasyon Yuvarlama (mm)</label>
+              <select id="admStripRoundStep" class="field-input mono">
+                <option value="0.1">0.1 mm (Hassas)</option>
+                <option value="0.5">0.5 mm (Fabrika Standart)</option>
+                <option value="1">1.0 mm (Tam Sayı)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">1 Tır Standart Tonajı (Ton)</label>
+              <input type="number" id="admTruckTon" step="0.5" class="field-input mono">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Hızlı Profil Boyları (m, virgülle)</label>
+              <input type="text" id="admQuickLengths" placeholder="6, 12" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Hızlı Bağ Sayıları (virgülle)</label>
+              <input type="text" id="admQuickBundles" placeholder="1, 2, 5, 10" class="field-input mono">
+            </div>
+          </div>
+          <div class="field">
+            <label class="field-label">Standart Rulo Genişlikleri (mm, virgülle)</label>
+            <input type="text" id="admStandardCoils" placeholder="1000, 1219, 1250, 1380, 1500" class="field-input mono">
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Varsayılan Rulo Kenar Payı (mm)</label>
+              <input type="number" id="admDefaultTrim" step="0.5" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Varsayılan Dilme Bıçak Payı (mm)</label>
+              <input type="number" id="admDefaultKerf" step="0.1" class="field-input mono">
+            </div>
+          </div>
+          <button onclick="saveAdminSettingsFromForm()" class="btn btn-primary">💾 Mühendislik & Kurumsal Ayarları Uygula</button>
+        </div>
+      </div>
+
+      <!-- ADMIN ALT PANEL 2: FİYAT, DÖVİZ, KDV/TVA & MALİYET -->
+      <div id="admPanel_pricing" class="grid-main hidden">
+        <div class="card stack">
+          <h3 class="card-title">💰 Fiyatlandırma, Vergi & Satış Sınırları</h3>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Varsayılan Para Birimi</label>
+              <select id="admDefaultCurrency" class="field-input">
+                <option value="DA">DA (Cezayir Dinarı)</option>
+                <option value="₺">₺ (Türk Lirası)</option>
+                <option value="$">$ (ABD Doları)</option>
+                <option value="€">€ (Euro)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">Varsayılan 1 KG Satış Fiyatı</label>
+              <input type="number" id="admDefaultKgPrice" step="0.5" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Varsayılan Vergi / TVA / KDV (%)</label>
+              <input type="number" id="admDefaultVatRate" step="0.5" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Satış Alt Sınır (Min. Taban Kg Fiyatı)</label>
+              <input type="number" id="admMinFloorKgPrice" step="0.5" class="field-input mono" title="Satış personeli bu fiyatın altına inemez (0 = sınır yok)">
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label class="field-label">Maksimum İskonto Limiti (%)</label>
+              <input type="number" id="admMaxDiscountPct" step="1" class="field-input mono">
+            </div>
+            <div class="field">
+              <label class="field-label">Hızlı KG Fiyat Butonları (virgülle)</label>
+              <input type="text" id="admQuickPrices" placeholder="135, 140, 145, 150, 160" class="field-input mono">
+            </div>
+          </div>
+          <button onclick="saveAdminSettingsFromForm()" class="btn btn-primary">💾 Fiyat & Vergi Kurallarını Kaydet</button>
+        </div>
+
+        <div class="card stack">
+          <h3 class="card-title">📈 Yönetici Gizli Maliyet & Döviz Kurları</h3>
+          <p style="font-size:0.75rem;color:var(--text-muted);">Maliyet alanları yalnızca Yönetici rolünde canlı kâr marjı hesaplamak için kullanılır; müşteriye ve diğer rollere asla gösterilmez.</p>
+          <div class="grid-2">
+            <div class="field purple">
+              <label class="field-label">Bobin Hammadde Maliyeti (1 Kg)</label>
+              <input type="number" id="admRawCostPerKg" step="0.5" min="0" class="field-input mono">
+            </div>
+            <div class="field purple">
+              <label class="field-label">Üretim + İşçilik Maliyeti (1 Kg)</label>
+              <input type="number" id="admProdCostPerKg" step="0.5" min="0" class="field-input mono">
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:10px;">
+            <div style="font-size:0.76rem;font-weight:800;margin-bottom:8px;">DÖVİZ KURLARI (1 BİRİM KARŞILIĞI ANA PARA BİRİMİ)</div>
+            <div class="grid-3">
+              <div class="field">
+                <label class="field-label">1 USD ($) Karşılığı</label>
+                <input type="number" id="admRateUSD" step="0.1" class="field-input mono">
+              </div>
+              <div class="field">
+                <label class="field-label">1 EUR (€) Karşılığı</label>
+                <input type="number" id="admRateEUR" step="0.1" class="field-input mono">
+              </div>
+              <div class="field">
+                <label class="field-label">1 TRY (₺) Karşılığı</label>
+                <input type="number" id="admRateTRY" step="0.01" class="field-input mono">
+              </div>
+            </div>
+          </div>
+          <button onclick="saveAdminSettingsFromForm()" class="btn btn-primary">💾 Maliyet & Kur Ayarlarını Kaydet</button>
+        </div>
+      </div>
+
+      <!-- ADMIN ALT PANEL 3: KALIP & BANT VERİTABANI YÖNETİMİ (CRUD) -->
+      <div id="admPanel_molds" class="card stack hidden">
+        <div class="row-between">
+          <div>
+            <h3 class="card-title">🔩 Kalıp, Profil ve Bant Genişliği Veritabanı Yönetimi</h3>
+            <p style="font-size:0.75rem;color:var(--text-muted);">Yeni kalıp/profil ekleyebilir, mevcut 63 ve 140 Hat kalıplarının bağ adedini veya her kalınlıktaki bant genişliğini düzenleyebilirsiniz.</p>
+          </div>
+          <div class="row-wrap">
+            <input type="text" id="admMoldFilterInput" oninput="renderAdminMoldTable()" placeholder="Kalıp ara..." style="background:var(--surface-alt);border:1px solid var(--border);padding:7px 10px;border-radius:8px;font-size:0.82rem;">
+            <button onclick="openMoldEditorModal(null)" class="btn btn-primary btn-sm">+ Yeni Kalıp / Profil Ekle</button>
+            <button onclick="downloadMoldDatabaseExcel()" class="btn btn-outline btn-sm">Excel İndir</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+          <table class="corp-table">
+            <thead>
+              <tr>
+                <th>Hat</th>
+                <th>Kalıp</th>
+                <th>Tip</th>
+                <th>Profil Ölçüsü</th>
+                <th class="text-center">1 Bağ</th>
+                <th>Et → Bant Genişlikleri (mm)</th>
+                <th>Fabrika Notu</th>
+                <th class="text-center">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="admMoldTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ADMIN ALT PANEL 4: KULLANICILAR, PIN VE ROL YETKİ MATRİSİ -->
+      <div id="admPanel_roles" class="grid-main hidden">
+        <div class="card stack">
+          <div class="row-between">
+            <h3 class="card-title">👥 Kullanıcı Hesapları & PIN Yönetimi</h3>
+            <button onclick="openUserEditorModal(null)" class="btn btn-primary btn-sm">+ Yeni Kullanıcı Ekle</button>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;font-weight:700;padding:8px 10px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;cursor:pointer;">
+            <input type="checkbox" id="admRequirePinOnSwitch" onchange="onPinRequirementToggle(this.checked)" style="width:17px;height:17px;">
+            <span>Yetkili rollere (Yönetici / Satış) geçişte PIN kodu sorulsun</span>
+          </label>
+          <div id="admUsersList" class="stack" style="gap:8px;"></div>
+        </div>
+
+        <div class="card stack">
+          <h3 class="card-title">🛡️ Rol Bazlı Yetki Matrisi (RBAC)</h3>
+          <p style="font-size:0.75rem;color:var(--text-muted);">Her rolün hangi ekranları görebileceğini ve hangi işlemleri yapabileceğini anlık olarak belirleyin (Yönetici her zaman tam yetkilidir).</p>
+          <div class="table-wrap">
+            <table class="corp-table">
+              <thead>
+                <tr>
+                  <th>Yetki / Özellik</th>
+                  <th class="text-center">💼 Satış</th>
+                  <th class="text-center">⚙️ Operatör</th>
+                  <th class="text-center">👁️ Misafir</th>
+                </tr>
+              </thead>
+              <tbody id="admPermissionsMatrixBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ==================== MOBİL ALT NAVİGASYON ==================== -->
+  <nav class="mobile-bottom-nav no-print" aria-label="Mobil Alt Menü">
+    <button id="mTab_calc" onclick="switchTab('calc')" class="mob-tab active">
+      <span style="font-size:1.1rem;">⚡</span>
+      <span>Hesap & Fiyat</span>
+    </button>
+    <button id="mTab_quote" onclick="switchTab('quote')" class="mob-tab">
+      <span style="font-size:1.1rem;">📋</span>
+      <span>Teklif</span>
+      <span id="mBadgeQuote" class="mob-badge mono hidden">0</span>
+    </button>
+    <button id="mTab_slit" onclick="switchTab('slit')" class="mob-tab">
+      <span style="font-size:1.1rem;">✂️</span>
+      <span>Dilme</span>
+      <span id="mBadgeSlit" class="mob-badge mono hidden">0</span>
+    </button>
+    <button id="mTab_files" onclick="switchTab('files')" class="mob-tab">
+      <span style="font-size:1.1rem;">📂</span>
+      <span>Dosya/Kalıp</span>
+    </button>
+    <button id="mTab_admin" onclick="switchTab('admin')" class="mob-tab">
+      <span style="font-size:1.1rem;">⚙️</span>
+      <span>Yönetim</span>
+    </button>
+  </nav>
+
+  <!-- ==================== MODAL: ROL / KULLANICI GEÇİŞ & PIN ==================== -->
+  <div id="roleModal" class="modal-backdrop hidden" onclick="if(event.target===this)closeRoleModal()">
+    <div class="modal-panel stack">
+      <div class="row-between">
+        <h3 class="card-title">🔐 Kullanıcı & Rol Seçimi</h3>
+        <button onclick="closeRoleModal()" class="btn btn-outline btn-sm">✕</button>
+      </div>
+      <p style="font-size:0.78rem;color:var(--text-muted);">Çalışma moduna uygun kullanıcıyı seçin. Yönetici tüm sistem ve kalıp ayarlarını yönetebilir.</p>
+      <div id="roleUsersModalList" class="stack" style="gap:8px;"></div>
+      <div id="pinEntryBox" class="hidden" style="background:var(--surface-alt);border:1px solid var(--primary);border-radius:10px;padding:12px;">
+        <div id="pinPromptLabel" style="font-size:0.82rem;font-weight:800;margin-bottom:6px;">PIN Kodu Girin:</div>
+        <div style="display:flex;gap:8px;">
+          <input type="password" id="inputRolePin" maxlength="8" inputmode="numeric" placeholder="PIN (Varsayılan: 1234)" onkeydown="if(event.key==='Enter')submitRolePin()" class="field-input mono" style="background:var(--surface);border:1px solid var(--border-strong);padding:8px 12px;border-radius:8px;">
+          <button onclick="submitRolePin()" class="btn btn-primary">Giriş Yap</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: KALIP EKLE / DÜZENLE (ADMIN) ==================== -->
+  <div id="moldEditorModal" class="modal-backdrop hidden" onclick="if(event.target===this)closeMoldEditorModal()">
+    <div class="modal-panel wide stack">
+      <div class="row-between">
+        <h3 id="moldEditorTitle" class="card-title">🔩 Kalıp / Profil Düzenle</h3>
+        <button onclick="closeMoldEditorModal()" class="btn btn-outline btn-sm">✕</button>
+      </div>
+      <input type="hidden" id="editMoldId">
+      <div class="grid-4">
+        <div class="field">
+          <label class="field-label">Üretim Hattı</label>
+          <select id="editMoldLine" class="field-input">
+            <option value="63">63 HAT</option>
+            <option value="140">140 HAT</option>
+            <option value="OZEL">ÖZEL HAT</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Kalıp Kodu (Örn: 38Ø)</label>
+          <input type="text" id="editMoldKalip" placeholder="38Ø" class="field-input mono">
+        </div>
+        <div class="field">
+          <label class="field-label">Ürün Tipi</label>
+          <select id="editMoldType" onchange="onEditMoldTypeChange()" class="field-input">
+            <option value="Kutu">Kutu / Kare Profil</option>
+            <option value="Boru">Boru</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">1 Bağdaki Boy Adedi</label>
+          <input type="number" id="editMoldBag" value="60" min="1" class="field-input mono">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="field">
+          <label class="field-label">Görünen Ad (Örn: 40x20 veya Ø38 Boru)</label>
+          <input type="text" id="editMoldLabel" placeholder="40x20" class="field-input">
+        </div>
+        <div class="field">
+          <label class="field-label">Kenar A / Dış Çap (mm)</label>
+          <input type="number" id="editMoldA" step="any" class="field-input mono">
+        </div>
+        <div class="field">
+          <label class="field-label">Kenar B (Boru ise 0)</label>
+          <input type="number" id="editMoldB" step="any" class="field-input mono">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Fabrika Uyarı / Özel Notu (İsteğe bağlı)</label>
+        <input type="text" id="editMoldNote" placeholder="Örn: Mengene yok / Modifiye ediliyor..." class="field-input">
+      </div>
+      <div>
+        <div style="font-size:0.78rem;font-weight:800;margin-bottom:6px;">ET KALINLIĞI (mm) → BANT GENİŞLİĞİ (mm) HÜCRELERİ (Boş bırakılan kalınlıklar pasif olur)</div>
+        <div id="editMoldStripsGrid" class="grid-4"></div>
+      </div>
+      <div class="row-between">
+        <button id="btnDeleteMoldModal" onclick="deleteMoldFromModal()" class="btn btn-danger hidden">Bu Kalıbı Sil</button>
+        <div class="row-wrap" style="margin-left:auto;">
+          <button onclick="closeMoldEditorModal()" class="btn btn-outline">İptal</button>
+          <button onclick="saveMoldFromModal()" class="btn btn-primary">💾 Kalıbı Kaydet</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: KULLANICI EKLE / DÜZENLE ==================== -->
+  <div id="userEditorModal" class="modal-backdrop hidden" onclick="if(event.target===this)closeUserEditorModal()">
+    <div class="modal-panel stack">
+      <div class="row-between">
+        <h3 class="card-title">👤 Kullanıcı Hesabı Tanımla</h3>
+        <button onclick="closeUserEditorModal()" class="btn btn-outline btn-sm">✕</button>
+      </div>
+      <input type="hidden" id="editUserId">
+      <div class="field">
+        <label class="field-label">Ad Soyad / Ünvan</label>
+        <input type="text" id="editUserName" placeholder="Örn: Umut Bey / Satış Ekibi" class="field-input">
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label class="field-label">Rol Yetkisi</label>
+          <select id="editUserRole" class="field-input">
+            <option value="admin">👑 Yönetici (Tam Yetki)</option>
+            <option value="sales">💼 Satış & Teklif Uzmanı</option>
+            <option value="operator">⚙️ Üretim & Dilme Operatörü</option>
+            <option value="viewer">👁️ Misafir / Görüntüleyici</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Giriş PIN Kodu</label>
+          <input type="text" id="editUserPin" maxlength="8" inputmode="numeric" placeholder="Örn: 1234" class="field-input mono">
+        </div>
+      </div>
+      <div class="row-between">
+        <button onclick="closeUserEditorModal()" class="btn btn-outline">İptal</button>
+        <button onclick="saveUserFromModal()" class="btn btn-primary">💾 Kullanıcıyı Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PWA KURULUM REHBERİ ==================== -->
+  <div id="pwaGuideModal" class="modal-backdrop hidden" onclick="if(event.target===this)document.getElementById('pwaGuideModal').classList.add('hidden')">
+    <div class="modal-panel stack">
+      <div class="row-between">
+        <h3 class="card-title">📲 Uygulamayı Cihaza Yükle (Çevrimdışı PWA)</h3>
+        <button onclick="document.getElementById('pwaGuideModal').classList.add('hidden')" class="btn btn-outline btn-sm">✕</button>
+      </div>
+      <div style="font-size:0.84rem;line-height:1.6;" class="stack">
+        <div style="padding:10px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);">
+          <strong>🤖 Android / Chrome / Edge:</strong><br>
+          Tarayıcı sağ üst menüsünden <b>"Uygulamayı Yükle"</b> veya <b>"Ana Ekrana Ekle"</b> seçeneğine dokunun.
+        </div>
+        <div style="padding:10px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);">
+          <strong>🍎 iPhone / iPad (Safari):</strong><br>
+          Alt bardaki <b>Paylaş (↑)</b> simgesine dokunun ve <b>"Ana Ekrana Ekle"</b> seçeneğine basın.
+        </div>
+        <p style="font-size:0.76rem;color:var(--text-muted);">Yüklendikten sonra internet bağlantısı olmadan da (uçak modunda / fabrika sahasında) tüm hesaplama, dilme ve dosya özellikleri tam hızda çalışır.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== YAZDIRMA BELGESİ (KURUMSAL PDF) ==================== -->
+  <div id="printDocument"></div>
+
+  <!-- ==================== TOAST BİLDİRİM ==================== -->
+  <div id="toastEl" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
