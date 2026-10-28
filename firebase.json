@@ -4,6 +4,10 @@
     "ignore": [
       "firebase.json",
       "**/.*",
+      ".git/**",
+      "**/.git/**",
+      ".github/**",
+      "**/.github/**",
       "**/node_modules/**",
       "README.md"
     ],
@@ -29,3 +33,4 @@
     ]
   }
 }
+
