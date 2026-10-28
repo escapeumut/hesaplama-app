@@ -1,4 +1,4 @@
-const CACHE_NAME = 'umitck-erp-pwa-v5.2.0';
+const CACHE_NAME = 'umitck-erp-pwa-v5.4.0';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,9 @@ const CORE_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((cache) => Promise.all(CORE_ASSETS.map((url) => fetch(url, { cache: 'reload' }).then((res) => cache.put(url, res)))))
+      .then(() => self.skipWaiting())
   );
 });
 

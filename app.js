@@ -5,56 +5,82 @@
 
 'use strict';
 
-// ==================== 1. DOĞRULANMIŞ 45 FABRİKA KALIP VERİTABANI ====================
+// ==================== 1. DOĞRULANMIŞ 45 FABRİKA KALIP VERİTABANI & KALIP LİSTESİ BAĞ MOTORU ====================
+const BUNDLE_SCHEMA_VERSION = 2;
+const NOMINAL_TOL = 1.6; // Ticari boru adı ↔ kalıp çapı toleransı (49↔48,3Ø · 90↔88,9Ø · 140↔139,7Ø)
+const HEX_BUNDLES = [7, 19, 37, 61, 91, 127, 169, 217, 271, 331];
+const KUTU_BAGLARI = [16, 20, 25, 30, 35, 36, 40, 42, 48, 49, 50, 56, 64, 70, 81, 96, 100, 120, 144, 150, 216, 225];
+
+const BAG_TURLERI = [
+  { code: 'ROUND', name: 'Yuvarlak Boru', short: 'Yuvarlak' },
+  { code: 'SQUARE', name: 'Kare Profil', short: 'Kare' },
+  { code: 'RECT', name: 'Dikdörtgen Profil', short: 'Dikdörtgen' },
+  { code: 'TEK', name: 'Tek Parça (Sac / Lama)', short: 'Tek Parça' }
+];
+
+/**
+ * Fabrika Kalıp Listesi Bağ Adedi Tohumu (BAG_TOHUM) — Ölçüye bağlı gerçek bağ adetleri:
+ * Değer dış ölçüye bağlıdır; et kalınlığı, boy ve cins (siyah/galvaniz) 1 bağdaki adedi değiştirmez.
+ */
+const BAG_TOHUM_RAW = [
+  ...[[21, 217], [21.5, 217], [22, 217], [27, 169], [32, 127], [34, 127], [42, 91], [49, 91], [51, 91], [60, 61], [63, 61], [76, 37], [90, 37], [114, 19], [140, 14]]
+    .map(([od, pcs]) => ({ kind: 'ROUND', od, pcs })),
+  ...[[20, 225], [25, 225], [30, 144], [35, 100], [40, 100], [50, 64], [60, 49], [100, 25]]
+    .map(([a, pcs]) => ({ kind: 'SQUARE', a, b: a, pcs })),
+  ...[[30, 20, 216], [40, 20, 150], [40, 27, 120], [40, 30, 120], [50, 30, 96], [60, 40, 70], [70, 50, 48], [80, 40, 50], [80, 60, 35], [100, 40, 40], [100, 50, 32]]
+    .map(([a, b, pcs]) => ({ kind: 'RECT', a, b, pcs })),
+  { kind: 'TEK', pcs: 1, size: 'SAC PLAKA / TOLE / LAMA (FER PLAT)', note: 'Bağ yok — tek parça' }
+];
+
 const DEFAULT_MOLDS = [
   // --- 63 HAT (21Ø – 63Ø) ---
-  { id: '63_21_B', line: '63', kalip: '21Ø', type: 'Boru', shape: 'pipe', label: 'Ø21 Boru', aliases: '21.3 1/2 yarim parmak', a: 21, b: 0, defaultBag: 127, note: '', strips: { '0.8': 67, '1': 66, '1.5': 66 } },
-  { id: '63_25_B', line: '63', kalip: '25Ø', type: 'Boru', shape: 'pipe', label: 'Ø25 Boru', aliases: '25 boru', a: 25, b: 0, defaultBag: 91, note: '', strips: { '0.8': 80, '1': 79.5, '1.5': 79, '2': 78.5 } },
-  { id: '63_25_K_20x20', line: '63', kalip: '25Ø', type: 'Kutu', shape: 'square', label: '20x20', aliases: '20 kare 20*20', a: 20, b: 20, defaultBag: 100, note: '', strips: { '0.8': 80, '1': 79, '1.5': 78.5, '2': 78 } },
-  { id: '63_269_B', line: '63', kalip: '26,9Ø', type: 'Boru', shape: 'pipe', label: 'Ø26,9 Boru', aliases: '26.9 27 3/4 uc ceyrek parmak', a: 26.9, b: 0, defaultBag: 91, note: '', strips: { '0.8': 85, '1': 84, '1.5': 84, '2': 83 } },
-  { id: '63_32_B', line: '63', kalip: '32Ø', type: 'Boru', shape: 'pipe', label: 'Ø32 Boru', aliases: '32 boru', a: 32, b: 0, defaultBag: 61, note: '', strips: { '0.8': 100, '1': 99, '1.5': 99, '2': 98, '2.5': 97 } },
-  { id: '63_32_K_25x25', line: '63', kalip: '32Ø', type: 'Kutu', shape: 'square', label: '25x25', aliases: '25 kare 25*25', a: 25, b: 25, defaultBag: 64, note: '', strips: { '0.8': 99, '1': 98.5, '1.5': 98, '2': 97.5, '2.5': 97 } },
-  { id: '63_337_B', line: '63', kalip: '33,7Ø', type: 'Boru', shape: 'pipe', label: 'Ø33,7 Boru', aliases: '33.7 34 1 parmak 1"', a: 33.7, b: 0, defaultBag: 61, note: '', strips: { '0.8': 106, '1': 105, '1.5': 104, '2': 104, '2.5': 103 } },
-  { id: '63_38_B', line: '63', kalip: '38Ø', type: 'Boru', shape: 'pipe', label: 'Ø38 Boru', aliases: '38 boru', a: 38, b: 0, defaultBag: 61, note: '', strips: { '0.8': 120, '1': 119, '1.5': 118, '2': 117, '2.5': 116 } },
-  { id: '63_38_K_30x30', line: '63', kalip: '38Ø', type: 'Kutu', shape: 'square', label: '30x30', aliases: '30 kare 30*30', a: 30, b: 30, defaultBag: 64, note: '', strips: { '0.8': 119, '1': 118, '1.5': 117, '2': 116, '2.5': 115 } },
-  { id: '63_38_K_40x20', line: '63', kalip: '38Ø', type: 'Kutu', shape: 'box', label: '40x20', aliases: '20x40 40*20', a: 40, b: 20, defaultBag: 60, note: '', strips: { '0.8': 119, '1': 118, '1.5': 117, '2': 116, '2.5': 115 } },
-  { id: '63_42_B', line: '63', kalip: '42Ø', type: 'Boru', shape: 'pipe', label: 'Ø42 Boru', aliases: '42.4 42 1 1/4 bir ceyrek', a: 42, b: 0, defaultBag: 37, note: '', strips: { '0.8': 133, '1': 132, '1.5': 131, '2': 130, '2.5': 129 } },
-  { id: '63_42_K_40x27', line: '63', kalip: '42Ø', type: 'Kutu', shape: 'box', label: '40x27', aliases: '27x40 40*27', a: 40, b: 27, defaultBag: 48, note: '42Ø kalıp modifiye ediliyor (42Ø referans bant)', strips: { '0.8': 133, '1': 132, '1.5': 131, '2': 130, '2.5': 129 } },
-  { id: '63_45_B', line: '63', kalip: '45Ø', type: 'Boru', shape: 'pipe', label: 'Ø45 Boru', aliases: '45 boru', a: 45, b: 0, defaultBag: 37, note: '', strips: { '0.8': 142, '1': 141, '1.5': 140, '2': 139, '2.5': 138, '3': 138 } },
-  { id: '63_45_K_40x30', line: '63', kalip: '45Ø', type: 'Kutu', shape: 'box', label: '40x30', aliases: '30x40 40*30', a: 40, b: 30, defaultBag: 48, note: '', strips: { '0.8': 141.5, '1': 141, '1.5': 139.5, '2': 139, '2.5': 138.5, '3': 138 } },
-  { id: '63_45_K_35x35', line: '63', kalip: '45Ø', type: 'Kutu', shape: 'square', label: '35x35', aliases: '35 kare 35*35', a: 35, b: 35, defaultBag: 49, note: '', strips: { '0.8': 141.5, '1': 141, '1.5': 139.5, '2': 139, '2.5': 138.5, '3': 138 } },
-  { id: '63_483_B', line: '63', kalip: '48,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø48,3 Boru', aliases: '48.3 48 1 1/2 bir bucuk parmak', a: 48.3, b: 0, defaultBag: 37, note: '', strips: { '0.8': 152, '1': 151, '1.5': 150, '2': 149, '2.5': 148 } },
-  { id: '63_51_B', line: '63', kalip: '51Ø', type: 'Boru', shape: 'pipe', label: 'Ø51 Boru', aliases: '51 boru', a: 51, b: 0, defaultBag: 37, note: '', strips: { '0.8': 160, '1': 159, '1.5': 158, '2': 157, '2.5': 156, '3': 155 } },
-  { id: '63_51_K_40x40', line: '63', kalip: '51Ø', type: 'Kutu', shape: 'square', label: '40x40', aliases: '40 kare 40*40', a: 40, b: 40, defaultBag: 36, note: '', strips: { '0.8': 159, '1': 158, '1.5': 157, '2': 156, '2.5': 155, '3': 154 } },
-  { id: '63_51_K_50x30', line: '63', kalip: '51Ø', type: 'Kutu', shape: 'box', label: '50x30', aliases: '30x50 50*30', a: 50, b: 30, defaultBag: 36, note: '', strips: { '0.8': 159, '1': 158, '1.5': 157, '2': 156, '2.5': 155, '3': 154 } },
-  { id: '63_57_B', line: '63', kalip: '57Ø', type: 'Boru', shape: 'pipe', label: 'Ø57 Boru', aliases: '57 boru', a: 57, b: 0, defaultBag: 37, note: 'Yeni kalıp • Defter referans bant: 178 mm', strips: { '1': 179, '1.5': 178, '2': 177, '2.5': 176, '3': 175 } },
-  { id: '63_603_B', line: '63', kalip: '60,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø60,3 Boru', aliases: '60.3 60 2 parmak 2"', a: 60.3, b: 0, defaultBag: 37, note: '', strips: { '1': 189, '1.5': 188, '2': 187, '2.5': 186, '3': 185, '3.5': 184 } },
-  { id: '63_63_B', line: '63', kalip: '63Ø', type: 'Boru', shape: 'pipe', label: 'Ø63 Boru (63H)', aliases: '63 boru', a: 63, b: 0, defaultBag: 37, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
-  { id: '63_63_K_50x50', line: '63', kalip: '63Ø', type: 'Kutu', shape: 'square', label: '50x50 (63H)', aliases: '50 kare 50*50', a: 50, b: 50, defaultBag: 25, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
-  { id: '63_63_K_60x40', line: '63', kalip: '63Ø', type: 'Kutu', shape: 'box', label: '60x40 (63H)', aliases: '40x60 60*40', a: 60, b: 40, defaultBag: 24, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '63_21_B', line: '63', kalip: '21Ø', type: 'Boru', shape: 'pipe', label: 'Ø21 Boru', aliases: '21.3 21.5 22 1/2 yarim parmak', a: 21, b: 0, defaultBag: 217, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 67, '1': 66, '1.5': 66 } },
+  { id: '63_25_B', line: '63', kalip: '25Ø', type: 'Boru', shape: 'pipe', label: 'Ø25 Boru', aliases: '25 boru', a: 25, b: 0, defaultBag: 169, bagSource: 'tahmin', bagLayout: 'altıgen', note: '', strips: { '0.8': 80, '1': 79.5, '1.5': 79, '2': 78.5 } },
+  { id: '63_25_K_20x20', line: '63', kalip: '25Ø', type: 'Kutu', shape: 'square', label: '20x20', aliases: '20 kare 20*20', a: 20, b: 20, defaultBag: 225, bagSource: 'tanım', bagLayout: '15×15', note: '', strips: { '0.8': 80, '1': 79, '1.5': 78.5, '2': 78 } },
+  { id: '63_269_B', line: '63', kalip: '26,9Ø', type: 'Boru', shape: 'pipe', label: 'Ø26,9 Boru', aliases: '26.9 27 3/4 uc ceyrek parmak', a: 26.9, b: 0, defaultBag: 169, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 85, '1': 84, '1.5': 84, '2': 83 } },
+  { id: '63_32_B', line: '63', kalip: '32Ø', type: 'Boru', shape: 'pipe', label: 'Ø32 Boru', aliases: '32 boru', a: 32, b: 0, defaultBag: 127, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 100, '1': 99, '1.5': 99, '2': 98, '2.5': 97 } },
+  { id: '63_32_K_25x25', line: '63', kalip: '32Ø', type: 'Kutu', shape: 'square', label: '25x25', aliases: '25 kare 25*25', a: 25, b: 25, defaultBag: 225, bagSource: 'tanım', bagLayout: '15×15', note: '', strips: { '0.8': 99, '1': 98.5, '1.5': 98, '2': 97.5, '2.5': 97 } },
+  { id: '63_337_B', line: '63', kalip: '33,7Ø', type: 'Boru', shape: 'pipe', label: 'Ø33,7 Boru', aliases: '33.7 34 1 parmak 1"', a: 33.7, b: 0, defaultBag: 127, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 106, '1': 105, '1.5': 104, '2': 104, '2.5': 103 } },
+  { id: '63_38_B', line: '63', kalip: '38Ø', type: 'Boru', shape: 'pipe', label: 'Ø38 Boru', aliases: '38 boru', a: 38, b: 0, defaultBag: 91, bagSource: 'tahmin', bagLayout: 'altıgen', note: '', strips: { '0.8': 120, '1': 119, '1.5': 118, '2': 117, '2.5': 116 } },
+  { id: '63_38_K_30x30', line: '63', kalip: '38Ø', type: 'Kutu', shape: 'square', label: '30x30', aliases: '30 kare 30*30', a: 30, b: 30, defaultBag: 144, bagSource: 'tanım', bagLayout: '12×12', note: '', strips: { '0.8': 119, '1': 118, '1.5': 117, '2': 116, '2.5': 115 } },
+  { id: '63_38_K_40x20', line: '63', kalip: '38Ø', type: 'Kutu', shape: 'box', label: '40x20', aliases: '20x40 40*20', a: 40, b: 20, defaultBag: 150, bagSource: 'tanım', bagLayout: '10×15', note: '', strips: { '0.8': 119, '1': 118, '1.5': 117, '2': 116, '2.5': 115 } },
+  { id: '63_42_B', line: '63', kalip: '42Ø', type: 'Boru', shape: 'pipe', label: 'Ø42 Boru', aliases: '42.4 42 1 1/4 bir ceyrek', a: 42, b: 0, defaultBag: 91, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 133, '1': 132, '1.5': 131, '2': 130, '2.5': 129 } },
+  { id: '63_42_K_40x27', line: '63', kalip: '42Ø', type: 'Kutu', shape: 'box', label: '40x27', aliases: '27x40 40*27', a: 40, b: 27, defaultBag: 120, bagSource: 'tanım', bagLayout: '10×12', note: '42Ø kalıp modifiye ediliyor (42Ø referans bant)', strips: { '0.8': 133, '1': 132, '1.5': 131, '2': 130, '2.5': 129 } },
+  { id: '63_45_B', line: '63', kalip: '45Ø', type: 'Boru', shape: 'pipe', label: 'Ø45 Boru', aliases: '45 boru', a: 45, b: 0, defaultBag: 91, bagSource: 'tahmin', bagLayout: 'altıgen', note: '', strips: { '0.8': 142, '1': 141, '1.5': 140, '2': 139, '2.5': 138, '3': 138 } },
+  { id: '63_45_K_40x30', line: '63', kalip: '45Ø', type: 'Kutu', shape: 'box', label: '40x30', aliases: '30x40 40*30', a: 40, b: 30, defaultBag: 120, bagSource: 'tanım', bagLayout: '10×12', note: '', strips: { '0.8': 141.5, '1': 141, '1.5': 139.5, '2': 139, '2.5': 138.5, '3': 138 } },
+  { id: '63_45_K_35x35', line: '63', kalip: '45Ø', type: 'Kutu', shape: 'square', label: '35x35', aliases: '35 kare 35*35', a: 35, b: 35, defaultBag: 100, bagSource: 'tanım', bagLayout: '10×10', note: '', strips: { '0.8': 141.5, '1': 141, '1.5': 139.5, '2': 139, '2.5': 138.5, '3': 138 } },
+  { id: '63_483_B', line: '63', kalip: '48,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø48,3 Boru', aliases: '48.3 48 49 1 1/2 bir bucuk parmak', a: 48.3, b: 0, defaultBag: 91, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 152, '1': 151, '1.5': 150, '2': 149, '2.5': 148 } },
+  { id: '63_51_B', line: '63', kalip: '51Ø', type: 'Boru', shape: 'pipe', label: 'Ø51 Boru', aliases: '51 boru', a: 51, b: 0, defaultBag: 91, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '0.8': 160, '1': 159, '1.5': 158, '2': 157, '2.5': 156, '3': 155 } },
+  { id: '63_51_K_40x40', line: '63', kalip: '51Ø', type: 'Kutu', shape: 'square', label: '40x40', aliases: '40 kare 40*40', a: 40, b: 40, defaultBag: 100, bagSource: 'tanım', bagLayout: '10×10', note: '', strips: { '0.8': 159, '1': 158, '1.5': 157, '2': 156, '2.5': 155, '3': 154 } },
+  { id: '63_51_K_50x30', line: '63', kalip: '51Ø', type: 'Kutu', shape: 'box', label: '50x30', aliases: '30x50 50*30', a: 50, b: 30, defaultBag: 96, bagSource: 'tanım', bagLayout: '8×12', note: '', strips: { '0.8': 159, '1': 158, '1.5': 157, '2': 156, '2.5': 155, '3': 154 } },
+  { id: '63_57_B', line: '63', kalip: '57Ø', type: 'Boru', shape: 'pipe', label: 'Ø57 Boru', aliases: '57 boru', a: 57, b: 0, defaultBag: 61, bagSource: 'tahmin', bagLayout: 'altıgen', note: 'Yeni kalıp • Defter referans bant: 178 mm', strips: { '1': 179, '1.5': 178, '2': 177, '2.5': 176, '3': 175 } },
+  { id: '63_603_B', line: '63', kalip: '60,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø60,3 Boru', aliases: '60.3 60 2 parmak 2"', a: 60.3, b: 0, defaultBag: 61, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1': 189, '1.5': 188, '2': 187, '2.5': 186, '3': 185, '3.5': 184 } },
+  { id: '63_63_B', line: '63', kalip: '63Ø', type: 'Boru', shape: 'pipe', label: 'Ø63 Boru (63H)', aliases: '63 boru', a: 63, b: 0, defaultBag: 61, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '63_63_K_50x50', line: '63', kalip: '63Ø', type: 'Kutu', shape: 'square', label: '50x50 (63H)', aliases: '50 kare 50*50', a: 50, b: 50, defaultBag: 64, bagSource: 'tanım', bagLayout: '8×8', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '63_63_K_60x40', line: '63', kalip: '63Ø', type: 'Kutu', shape: 'box', label: '60x40 (63H)', aliases: '40x60 60*40', a: 60, b: 40, defaultBag: 70, bagSource: 'tanım', bagLayout: '7×10', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
 
   // --- 140 HAT (63Ø – 139,7Ø) ---
-  { id: '140_63_B', line: '140', kalip: '63Ø', type: 'Boru', shape: 'pipe', label: 'Ø63 Boru (140H)', aliases: '63 boru 140h', a: 63, b: 0, defaultBag: 37, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
-  { id: '140_63_K_50x50', line: '140', kalip: '63Ø', type: 'Kutu', shape: 'square', label: '50x50 (140H)', aliases: '50 kare 50*50 140h', a: 50, b: 50, defaultBag: 25, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
-  { id: '140_63_K_60x40', line: '140', kalip: '63Ø', type: 'Kutu', shape: 'box', label: '60x40 (140H)', aliases: '40x60 60*40 140h', a: 60, b: 40, defaultBag: 24, note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
-  { id: '140_761_B', line: '140', kalip: '76,1Ø', type: 'Boru', shape: 'pipe', label: 'Ø76,1 Boru', aliases: '76.1 76 2 1/2 iki bucuk parmak', a: 76.1, b: 0, defaultBag: 19, note: '', strips: { '1.5': 239, '2': 238, '2.5': 237, '3': 236, '3.5': 235, '4': 234, '4.5': 233, '5': 232 } },
-  { id: '140_761_K_60x60', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'square', label: '60x60', aliases: '60 kare 60*60', a: 60, b: 60, defaultBag: 20, note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
-  { id: '140_761_K_80x40', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'box', label: '80x40', aliases: '40x80 80*40', a: 80, b: 40, defaultBag: 20, note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
-  { id: '140_761_K_70x50', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'box', label: '70x50', aliases: '50x70 70*50', a: 70, b: 50, defaultBag: 20, note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
-  { id: '140_889_B', line: '140', kalip: '88,9Ø', type: 'Boru', shape: 'pipe', label: 'Ø88,9 Boru', aliases: '88.9 89 3 parmak 3"', a: 88.9, b: 0, defaultBag: 19, note: '', strips: { '1.5': 279, '2': 278, '2.5': 277, '3': 276, '3.5': 275, '4': 274, '4.5': 273, '5': 272 } },
-  { id: '140_889_K_100x40', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '100x40', aliases: '40x100 100*40', a: 100, b: 40, defaultBag: 16, note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
-  { id: '140_889_K_80x60', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '80x60', aliases: '60x80 80*60', a: 80, b: 60, defaultBag: 16, note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
-  { id: '140_889_K_90x50', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '90x50', aliases: '50x90 90*50', a: 90, b: 50, defaultBag: 16, note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
-  { id: '140_889_K_70x70', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'square', label: '70x70', aliases: '70 kare 70*70', a: 70, b: 70, defaultBag: 16, note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
-  { id: '140_95_B', line: '140', kalip: '95Ø', type: 'Boru', shape: 'pipe', label: 'Ø95 Boru', aliases: '95 boru', a: 95, b: 0, defaultBag: 19, note: '3.5mm seriye göre 295mm (basılı listede 293 kontrol notlu)', strips: { '1.5': 298, '2': 298, '2.5': 297, '3': 296, '3.5': 295, '4': 294, '4.5': 293, '5': 292, '5.5': 291 } },
-  { id: '140_95_K_100x50', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '100x50', aliases: '50x100 100*50', a: 100, b: 50, defaultBag: 12, note: '', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
-  { id: '140_95_K_90x60', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '90x60', aliases: '60x90 90*60', a: 90, b: 60, defaultBag: 12, note: 'Mengene yok (95Ø Kalıp)', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
-  { id: '140_95_K_80x70', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '80x70', aliases: '70x80 80*70', a: 80, b: 70, defaultBag: 12, note: 'Mengene yok (95Ø Kalıp)', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
-  { id: '140_1143_B', line: '140', kalip: '114,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø114,3 Boru', aliases: '114.3 114 4 parmak 4"', a: 114.3, b: 0, defaultBag: 14, note: '', strips: { '1.5': 359, '2': 358, '2.5': 357, '3': 356, '3.5': 355, '4': 354, '4.5': 353, '5': 352, '5.5': 351 } },
-  { id: '140_1143_K_120x60', line: '140', kalip: '114,3Ø', type: 'Kutu', shape: 'box', label: '120x60', aliases: '60x120 120*60', a: 120, b: 60, defaultBag: 10, note: 'Defterden eklendi (114,3Ø referans bant)', strips: { '1.5': 358, '2': 357, '2.5': 356, '3': 355, '3.5': 354, '4': 353, '4.5': 352, '5': 351, '5.5': 350 } },
-  { id: '140_127_B', line: '140', kalip: '127Ø', type: 'Boru', shape: 'pipe', label: 'Ø127 Boru', aliases: '127 5 parmak 5"', a: 127, b: 0, defaultBag: 10, note: '', strips: { '1.5': 399, '2': 398, '2.5': 397, '3': 396, '3.5': 395, '4': 394, '4.5': 393, '5': 392, '5.5': 391 } },
-  { id: '140_127_K_100x100', line: '140', kalip: '127Ø', type: 'Kutu', shape: 'square', label: '100x100', aliases: '100 kare 100*100', a: 100, b: 100, defaultBag: 9, note: '', strips: { '1.5': 398, '2': 397, '2.5': 396, '3': 395, '3.5': 394, '4': 393, '4.5': 392, '5': 391, '5.5': 390 } },
-  { id: '140_1397_B', line: '140', kalip: '139,7Ø', type: 'Boru', shape: 'pipe', label: 'Ø139,7 Boru', aliases: '139.7 140 5 1/2 bes bucuk parmak', a: 139.7, b: 0, defaultBag: 7, note: '', strips: { '2': 438, '2.5': 437, '3': 436, '3.5': 435, '4': 434, '4.5': 433, '5': 432, '5.5': 431 } }
+  { id: '140_63_B', line: '140', kalip: '63Ø', type: 'Boru', shape: 'pipe', label: 'Ø63 Boru (140H)', aliases: '63 boru 140h', a: 63, b: 0, defaultBag: 61, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '140_63_K_50x50', line: '140', kalip: '63Ø', type: 'Kutu', shape: 'square', label: '50x50 (140H)', aliases: '50 kare 50*50 140h', a: 50, b: 50, defaultBag: 64, bagSource: 'tanım', bagLayout: '8×8', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '140_63_K_60x40', line: '140', kalip: '63Ø', type: 'Kutu', shape: 'box', label: '60x40 (140H)', aliases: '40x60 60*40 140h', a: 60, b: 40, defaultBag: 70, bagSource: 'tanım', bagLayout: '7×10', note: '', strips: { '1.5': 197, '2': 196, '2.5': 195, '3': 194, '3.5': 193, '4': 192 } },
+  { id: '140_761_B', line: '140', kalip: '76,1Ø', type: 'Boru', shape: 'pipe', label: 'Ø76,1 Boru', aliases: '76.1 76 2 1/2 iki bucuk parmak', a: 76.1, b: 0, defaultBag: 37, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1.5': 239, '2': 238, '2.5': 237, '3': 236, '3.5': 235, '4': 234, '4.5': 233, '5': 232 } },
+  { id: '140_761_K_60x60', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'square', label: '60x60', aliases: '60 kare 60*60', a: 60, b: 60, defaultBag: 49, bagSource: 'tanım', bagLayout: '7×7', note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
+  { id: '140_761_K_80x40', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'box', label: '80x40', aliases: '40x80 80*40', a: 80, b: 40, defaultBag: 50, bagSource: 'tanım', bagLayout: '5×10', note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
+  { id: '140_761_K_70x50', line: '140', kalip: '76,1Ø', type: 'Kutu', shape: 'box', label: '70x50', aliases: '50x70 70*50', a: 70, b: 50, defaultBag: 48, bagSource: 'tanım', bagLayout: '6×8', note: '', strips: { '1.5': 238, '2': 237, '2.5': 236, '3': 235, '3.5': 234, '4': 233, '4.5': 232, '5': 231 } },
+  { id: '140_889_B', line: '140', kalip: '88,9Ø', type: 'Boru', shape: 'pipe', label: 'Ø88,9 Boru', aliases: '88.9 89 90 3 parmak 3"', a: 88.9, b: 0, defaultBag: 37, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1.5': 279, '2': 278, '2.5': 277, '3': 276, '3.5': 275, '4': 274, '4.5': 273, '5': 272 } },
+  { id: '140_889_K_100x40', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '100x40', aliases: '40x100 100*40', a: 100, b: 40, defaultBag: 40, bagSource: 'tanım', bagLayout: '4×10', note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
+  { id: '140_889_K_80x60', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '80x60', aliases: '60x80 80*60', a: 80, b: 60, defaultBag: 35, bagSource: 'tanım', bagLayout: '5×7', note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
+  { id: '140_889_K_90x50', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'box', label: '90x50', aliases: '50x90 90*50', a: 90, b: 50, defaultBag: 32, bagSource: 'tahmin', bagLayout: '4×8', note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
+  { id: '140_889_K_70x70', line: '140', kalip: '88,9Ø', type: 'Kutu', shape: 'square', label: '70x70', aliases: '70 kare 70*70', a: 70, b: 70, defaultBag: 36, bagSource: 'tahmin', bagLayout: '6×6', note: '', strips: { '1.5': 278, '2': 277, '2.5': 276, '3': 275, '3.5': 274, '4': 273, '4.5': 272, '5': 271 } },
+  { id: '140_95_B', line: '140', kalip: '95Ø', type: 'Boru', shape: 'pipe', label: 'Ø95 Boru', aliases: '95 boru', a: 95, b: 0, defaultBag: 33, bagSource: 'tahmin', bagLayout: '6 sıra 6/5', note: '3.5mm seriye göre 295mm (basılı listede 293 kontrol notlu)', strips: { '1.5': 298, '2': 298, '2.5': 297, '3': 296, '3.5': 295, '4': 294, '4.5': 293, '5': 292, '5.5': 291 } },
+  { id: '140_95_K_100x50', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '100x50', aliases: '50x100 100*50', a: 100, b: 50, defaultBag: 32, bagSource: 'tanım', bagLayout: '4×8', note: '', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
+  { id: '140_95_K_90x60', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '90x60', aliases: '60x90 90*60', a: 90, b: 60, defaultBag: 32, bagSource: 'tahmin', bagLayout: '4×8', note: 'Mengene yok (95Ø Kalıp)', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
+  { id: '140_95_K_80x70', line: '140', kalip: '95Ø', type: 'Kutu', shape: 'box', label: '80x70', aliases: '70x80 80*70', a: 80, b: 70, defaultBag: 30, bagSource: 'tahmin', bagLayout: '5×6', note: 'Mengene yok (95Ø Kalıp)', strips: { '1.5': 297, '2': 296, '2.5': 295, '3': 294, '3.5': 293, '4': 292, '4.5': 291, '5': 290, '5.5': 289 } },
+  { id: '140_1143_B', line: '140', kalip: '114,3Ø', type: 'Boru', shape: 'pipe', label: 'Ø114,3 Boru', aliases: '114.3 114 4 parmak 4"', a: 114.3, b: 0, defaultBag: 19, bagSource: 'tanım', bagLayout: 'altıgen', note: '', strips: { '1.5': 359, '2': 358, '2.5': 357, '3': 356, '3.5': 355, '4': 354, '4.5': 353, '5': 352, '5.5': 351 } },
+  { id: '140_1143_K_120x60', line: '140', kalip: '114,3Ø', type: 'Kutu', shape: 'box', label: '120x60', aliases: '60x120 120*60', a: 120, b: 60, defaultBag: 24, bagSource: 'tahmin', bagLayout: '4×6', note: 'Defterden eklendi (114,3Ø referans bant)', strips: { '1.5': 358, '2': 357, '2.5': 356, '3': 355, '3.5': 354, '4': 353, '4.5': 352, '5': 351, '5.5': 350 } },
+  { id: '140_127_B', line: '140', kalip: '127Ø', type: 'Boru', shape: 'pipe', label: 'Ø127 Boru', aliases: '127 5 parmak 5"', a: 127, b: 0, defaultBag: 16, bagSource: 'tahmin', bagLayout: '', note: '', strips: { '1.5': 399, '2': 398, '2.5': 397, '3': 396, '3.5': 395, '4': 394, '4.5': 393, '5': 392, '5.5': 391 } },
+  { id: '140_127_K_100x100', line: '140', kalip: '127Ø', type: 'Kutu', shape: 'square', label: '100x100', aliases: '100 kare 100*100', a: 100, b: 100, defaultBag: 25, bagSource: 'tanım', bagLayout: '5×5', note: '', strips: { '1.5': 398, '2': 397, '2.5': 396, '3': 395, '3.5': 394, '4': 393, '4.5': 392, '5': 391, '5.5': 390 } },
+  { id: '140_1397_B', line: '140', kalip: '139,7Ø', type: 'Boru', shape: 'pipe', label: 'Ø139,7 Boru', aliases: '139.7 140 5 1/2 bes bucuk parmak', a: 139.7, b: 0, defaultBag: 14, bagSource: 'tanım', bagLayout: '', note: '', strips: { '2': 438, '2.5': 437, '3': 436, '3.5': 435, '4': 434, '4.5': 433, '5': 432, '5.5': 431 } }
 ];
 
 const ALL_WALL_COLUMNS = ['0.8', '1', '1.2', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5.5', '6'];
@@ -62,6 +88,7 @@ const SLIT_BAR_COLORS = ['#1d4ed8', '#d97706', '#047857', '#7c3aed', '#0891b2', 
 
 // ==================== 2. VARSAYILAN YÖNETİCİ AYARLARI & RBAC ====================
 const DEFAULT_SETTINGS = {
+  bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
   brandName: 'UMITCK ERP',
   brandCode: 'UC',
   brandSub: 'Kurumsal Profil, KG/Boy Fiyat & Dilme Sistemi',
@@ -126,6 +153,7 @@ const PERMISSION_LABELS = [
 // ==================== 3. UYGULAMA DURUMU (STATE) ====================
 let settings = cloneObj(DEFAULT_SETTINGS);
 let molds = cloneObj(DEFAULT_MOLDS);
+let bundleCounts = [];
 let users = cloneObj(DEFAULT_USERS);
 let rolePermissions = cloneObj(DEFAULT_PERMISSIONS);
 let currentUser = users[0]; // İlk kurulumda Yönetici aktif
@@ -147,7 +175,7 @@ let quoteItems = [];
 let savedQuotes = [];
 
 let slitItems = [
-  { id: 101, moldId: '63_38_K_40x20', label: '40x20 (38Ø)', line: '63', stripWidth: 116, count: 10, defaultBag: 60 }
+  { id: 101, moldId: '63_38_K_40x20', label: '40x20 (38Ø)', line: '63', stripWidth: 116, count: 10, defaultBag: 150 }
 ];
 
 let pendingRoleTargetUser = null;
@@ -341,6 +369,493 @@ function computeEN10219AreaMm2(shape, a, b, t) {
   return straightArea + cornerArea;
 }
 
+// ==================== 5B. FABRİKA KALIP LİSTESİ BAĞ ADEDİ & DİZİLİM MOTORU (bag.js) ====================
+
+function bagNum(v, d = 0) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : d;
+  const n = Number(String(v ?? '').trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : d;
+}
+
+function bagR3(v) {
+  return Math.round(bagNum(v) * 1000) / 1000;
+}
+
+function bagLblNum(v) {
+  return String(bagR3(v)).replace('.', ',');
+}
+
+function normProfileKey(s) {
+  const m = /(\d+(?:[.,]\d+)?)\s*[xX×*]\s*(\d+(?:[.,]\d+)?)/.exec(String(s || ''));
+  if (!m) return '';
+  const a = Number(m[1].replace(',', '.'));
+  const b = Number(m[2].replace(',', '.'));
+  return `${bagR3(Math.max(a, b))}x${bagR3(Math.min(a, b))}`;
+}
+
+function bagFoldUp(s) {
+  return String(s ?? '')
+    .replace(/[⌀øΦ]/g, 'Ø')
+    .replace(/[’‘´`′]/g, "'")
+    .toLocaleUpperCase('tr')
+    .replace(/İ/g, 'I').replace(/Ş/g, 'S').replace(/Ğ/g, 'G')
+    .replace(/Ü/g, 'U').replace(/Ö/g, 'O').replace(/Ç/g, 'C')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function bagBoxOf(a0, b0) {
+  const a = bagNum(a0);
+  const b = bagNum(b0);
+  if (!(a > 0) || !(b > 0)) return null;
+  const A = bagR3(Math.max(a, b));
+  const B = bagR3(Math.min(a, b));
+  return { kind: Math.abs(A - B) < 1e-9 ? 'SQUARE' : 'RECT', a: A, b: B, key: normProfileKey(`${A}x${B}`) };
+}
+
+function bagRoundOf(od) {
+  return bagNum(od) > 0 ? { kind: 'ROUND', od: bagR3(od) } : null;
+}
+
+function bagAnahtari(o) {
+  if (!o) return '';
+  if (o.kind === 'TEK') return 'TEK';
+  if (o.kind === 'ROUND') return bagNum(o.od) > 0 ? `R${bagR3(o.od)}` : '';
+  const p = bagBoxOf(o.a, o.kind === 'SQUARE' && !(bagNum(o.b) > 0) ? o.a : o.b);
+  return p ? `B${p.key}` : '';
+}
+
+function bagEtiketi(o) {
+  if (!o) return '';
+  if (o.kind === 'TEK') return 'Tek parça';
+  if (o.kind === 'ROUND') return bagNum(o.od) > 0 ? `Ø${bagLblNum(o.od)}` : '';
+  const p = bagBoxOf(o.a, o.kind === 'SQUARE' && !(bagNum(o.b) > 0) ? o.a : o.b);
+  return p ? p.key.replace(/\./g, ',') : '';
+}
+
+function bagDone(o) {
+  return o ? { ...o, key: bagAnahtari(o), etiket: bagEtiketi(o) } : null;
+}
+
+const BAG_TEK_RE = /(^|[^A-Z])(SAC|PLAKA|TOLE|LAMA|LEVHA|FER PLAT|PLAT)([^A-Z]|$)/;
+const BAG_ROUND_RE = /(^|[^A-Z])(BORU|BORUSU|ROND|ROUND|PIPE)([^A-Z]|$)|Ø/;
+const BAG_BOX_RE = /(^|[^A-Z])(PROFIL|PROF|KUTU|KARE|DIKDORTGEN|RECT|RECTANGULAIRE|CARE|CARRE|CARREE)([^A-Z]|$)/;
+
+function bagOlcuCoz(x) {
+  if (x === null || x === undefined || x === '') return null;
+  if (typeof x === 'number') return bagDone(bagRoundOf(x));
+  if (typeof x === 'object') {
+    if (x.t === 'R') return bagDone(bagRoundOf(x.od));
+    if (x.t === 'B') return bagDone(bagBoxOf(x.a, x.b));
+    if (x.kind === 'TEK') return bagDone({ kind: 'TEK' });
+    if (x.kind === 'ROUND') return bagDone(bagRoundOf(x.od));
+    if (x.kind === 'SQUARE') return bagDone(bagBoxOf(x.a, bagNum(x.b) > 0 ? x.b : x.a));
+    if (x.kind === 'RECT') return bagDone(bagBoxOf(x.a, x.b));
+    if (x.label || x.product || x.name) return bagOlcuCoz(x.label || x.product || x.name);
+    return null;
+  }
+  const T = bagFoldUp(x);
+  if (!T) return null;
+  const roundW = BAG_ROUND_RE.test(T);
+  const boxW = BAG_BOX_RE.test(T);
+  if (BAG_TEK_RE.test(T) && !/(^|[^A-Z])(BORU|ROND|PROFIL|PROF|KUTU|TUBE)([^A-Z]|$)/.test(T)) {
+    return bagDone({ kind: 'TEK' });
+  }
+  const m = /(Ø?)\s*(\d+(?:[.,]\d+)?)\s*(?:MM)?\s*[X×*]\s*(\d+(?:[.,]\d+)?)/.exec(T);
+  if (m) {
+    const a = bagNum(m[2]);
+    const b = bagNum(m[3]);
+    if (a > 0 && b > 0) {
+      const roundCtx = !!m[1] || (roundW && !boxW);
+      if (roundCtx && a >= 10 && b < 10) return bagDone(bagRoundOf(a));
+      if (!boxW && Math.max(a, b) >= 10 && Math.min(a, b) < 10) return bagDone(bagRoundOf(Math.max(a, b)));
+      if (Math.min(a, b) >= 10) return bagDone(bagBoxOf(a, b));
+      return null;
+    }
+  }
+  let r = /Ø\s*(\d+(?:[.,]\d+)?)/.exec(T);
+  if (r) return bagDone(bagRoundOf(bagNum(r[1])));
+  r = /(\d+(?:[.,]\d+)?)\s*'?\s*L[IU]K/.exec(T);
+  if (r && !boxW) return bagDone(bagRoundOf(bagNum(r[1])));
+  r = /^(\d+(?:[.,]\d+)?)\s*(?:MM)?$/.exec(T);
+  if (r) return bagDone(bagRoundOf(bagNum(r[1])));
+  r = /(\d+(?:[.,]\d+)?)/.exec(T);
+  if (r && bagNum(r[1]) >= 10) {
+    if (roundW && !boxW) return bagDone(bagRoundOf(bagNum(r[1])));
+    if (boxW && /KARE|CARE|CARRE/.test(T)) return bagDone(bagBoxOf(bagNum(r[1]), bagNum(r[1])));
+  }
+  return null;
+}
+
+function bagLiveRows(tablo) {
+  return (Array.isArray(tablo) ? tablo : []).filter((r) => r && r.active !== false && Math.round(bagNum(r.pcs)) > 0);
+}
+
+function bagKaydiBul(olcu, tablo = bundleCounts) {
+  if (!olcu) return null;
+  const rows = bagLiveRows(tablo);
+  if (olcu.kind === 'ROUND') {
+    const D = bagNum(olcu.od);
+    let best = null;
+    let bd = Infinity;
+    for (const r of rows) {
+      if (r.kind !== 'ROUND') continue;
+      const d = Math.abs(bagNum(r.od) - D);
+      if (d < bd - 1e-9) {
+        best = r;
+        bd = d;
+      }
+    }
+    return best && bd <= NOMINAL_TOL + 1e-9 ? best : null;
+  }
+  const key = olcu.key || bagAnahtari(olcu);
+  return rows.find((r) => (r.key || bagAnahtari(r)) === key) || null;
+}
+
+const BAG_TAHMIN_K = 3;
+const BAG_TAHMIN_UZAK = Math.log(2);
+const BAG_ORAN = 1.45;
+const BAG_YUV_ORAN = 1.2;
+const BAG_SIRA_ARA = Math.sqrt(3) / 2;
+
+function kutuDizilim(a, b, n) {
+  const duz = { adet: Math.max(1, Math.floor(n + 1e-9)), dizilim: '' };
+  if (Math.abs(a - b) < 1e-9) {
+    const k = Math.floor(Math.sqrt(n) + 1e-9);
+    return k >= 2 ? { adet: k * k, dizilim: `${k}×${k}` } : duz;
+  }
+  let en = null;
+  for (let c = 1; c <= n + 1e-9; c++) {
+    const r = Math.min(Math.floor(n / c + 1e-9), Math.floor((c * a * BAG_ORAN) / b + 1e-9));
+    if (r < 1 || (c * a) / (r * b) > BAG_ORAN + 1e-9) continue;
+    const m = c * r;
+    const sap = Math.abs(Math.log((c * a) / (r * b)));
+    if (!en || m > en.m || (m === en.m && sap < en.sap)) en = { m, c, r, sap };
+  }
+  return en ? { adet: en.m, dizilim: `${en.c}×${en.r}` } : duz;
+}
+
+function siraliDizilim(n) {
+  let en = null;
+  for (let r = 2; r <= n; r++) {
+    for (let c = 2; c <= n; c++) {
+      for (const eksik of [false, true]) {
+        const adet = eksik ? r * c - Math.floor(r / 2) : r * c;
+        if (adet > n + 1e-9) continue;
+        const oran = (eksik ? c : c + 0.5) / (1 + (r - 1) * BAG_SIRA_ARA);
+        if (oran > BAG_YUV_ORAN + 1e-9 || oran < 1 / BAG_YUV_ORAN - 1e-9) continue;
+        if (!en || adet > en.adet) {
+          en = { adet, dizilim: eksik ? `${r} sıra ${c}/${c - 1}` : `${r} sıra × ${c} kaydırmalı` };
+        }
+      }
+    }
+  }
+  return en;
+}
+
+function yuvarlakDizilim(n) {
+  if (n < HEX_BUNDLES[1]) return { adet: Math.max(1, Math.floor(n + 1e-9)), dizilim: '' };
+  const h = HEX_BUNDLES.filter((x) => x <= n + 1e-9).pop();
+  if (h < HEX_BUNDLES[2]) {
+    const s = siraliDizilim(n);
+    if (s && s.adet > h) return s;
+  }
+  return { adet: h, dizilim: 'altıgen' };
+}
+
+function describeBundleLayout(olcu, adet, fallbackDizilim = '') {
+  if (fallbackDizilim) return fallbackDizilim;
+  if (!olcu || !(adet > 0)) return '';
+  if (olcu.kind === 'TEK') return 'tek parça';
+  if (olcu.kind === 'ROUND') {
+    return HEX_BUNDLES.includes(adet) ? 'altıgen' : '';
+  }
+  if (olcu.kind === 'SQUARE') {
+    const k = Math.round(Math.sqrt(adet));
+    return k >= 2 && k * k === adet ? `${k}×${k}` : '';
+  }
+  if (olcu.kind === 'RECT') {
+    const a = bagNum(olcu.a);
+    const b = bagNum(olcu.b);
+    if (!(a > 0) || !(b > 0)) return '';
+    let best = null;
+    for (let c = 1; c <= adet; c++) {
+      if (adet % c !== 0) continue;
+      const r = adet / c;
+      const ratio = (c * a) / (r * b);
+      if (ratio > 1.8 || ratio < 1 / 1.8) continue;
+      const sap = Math.abs(Math.log(ratio));
+      if (!best || sap < best.sap) best = { c, r, sap };
+    }
+    return best ? `${best.c}×${best.r}` : '';
+  }
+  return '';
+}
+
+function bagTahmin(urun, tablo = bundleCounts, opt = {}) {
+  const olcu = urun && typeof urun === 'object' && urun.key && urun.etiket !== undefined ? urun : bagOlcuCoz(urun);
+  if (!olcu || olcu.kind === 'TEK') return null;
+  const yuv = olcu.kind === 'ROUND';
+  const a0 = yuv ? bagNum(olcu.od) : bagNum(olcu.a);
+  const b0 = yuv ? a0 : bagNum(olcu.b);
+  if (!(a0 > 0) || !(b0 > 0)) return null;
+  const la = Math.log(a0);
+  const lb = Math.log(b0);
+  const komsu = [];
+  for (const r of bagLiveRows(tablo)) {
+    if (yuv ? r.kind !== 'ROUND' : (r.kind !== 'SQUARE' && r.kind !== 'RECT')) continue;
+    const o = bagOlcuCoz(r);
+    const a = yuv ? bagNum(o?.od) : bagNum(o?.a);
+    const b = yuv ? a : bagNum(o?.b);
+    if (!(a > 0) || !(b > 0)) continue;
+    const d = yuv ? Math.abs(Math.log(a) - la) : Math.hypot(Math.log(a) - la, Math.log(b) - lb);
+    if (d <= BAG_TAHMIN_UZAK + 1e-9) komsu.push({ r, a, b, d, adet: Math.round(bagNum(r.pcs)) });
+  }
+  if (!komsu.length) return null;
+  komsu.sort((x, y) => x.d - y.d);
+  const sec = komsu.slice(0, BAG_TAHMIN_K);
+  const s0 = Math.sqrt(a0 * b0);
+  let sw = 0;
+  let sl = 0;
+  for (const k of sec) {
+    const w = 1 / (k.d * k.d + 1e-3);
+    sw += w;
+    sl += w * Math.log((k.adet * k.a * k.b * s0) / Math.sqrt(k.a * k.b));
+  }
+  const alan = Math.exp(sl / sw);
+  const ham = alan / (a0 * b0);
+  const enCok = Math.floor(bagNum(opt.enCok) + 1e-9);
+  const sinirli = enCok > 0 && enCok < ham;
+  const hedef = sinirli ? enCok : ham;
+  if (!(hedef >= 1)) return null;
+  const dz = yuv ? yuvarlakDizilim(hedef) : kutuDizilim(Math.max(a0, b0), Math.min(a0, b0), hedef);
+  const komsular = sec.map((k) => ({ etiket: bagEtiketi(k.r), adet: k.adet, uzaklik: Math.round(k.d * 1000) / 1000 }));
+  return {
+    adet: dz.adet,
+    ham: Math.round(ham * 10) / 10,
+    alan: Math.round(alan),
+    dizilim: dz.dizilim,
+    komsular,
+    sinirli,
+    ayrinti: `${dz.dizilim ? `${dz.dizilim} dizilim · ` : ''}hesap ≈${String(Math.round(ham * 10) / 10).replace('.', ',')} adet · komşu: ${komsular.map((k) => `${k.etiket} → ${k.adet}`).join(' · ')}`
+  };
+}
+
+function bagAdedi(urun, tablo = bundleCounts, opt = {}) {
+  const olcu = bagOlcuCoz(urun);
+  const secenekler = !olcu ? [] : olcu.kind === 'ROUND' ? HEX_BUNDLES : olcu.kind === 'TEK' ? [1] : KUTU_BAGLARI;
+  const kayit = bagKaydiBul(olcu, tablo);
+  if (kayit) {
+    const adet = Math.round(bagNum(kayit.pcs));
+    const fark = olcu.kind === 'ROUND' && Math.abs(bagNum(kayit.od) - bagNum(olcu.od)) > 1e-9;
+    const dizilim = describeBundleLayout(olcu, adet, '');
+    return {
+      adet,
+      kaynak: 'tanım',
+      dizilim,
+      olcu,
+      kayit,
+      etiket: olcu.etiket,
+      secenekler,
+      not: `Kalıp Listesi Bağ Tanımı: ${bagEtiketi(kayit)}${fark ? ` (${olcu.etiket} aynı boru)` : ''} → ${adet} Boy${dizilim ? ` (${dizilim})` : ''}`
+    };
+  }
+  if (olcu && olcu.kind === 'TEK') {
+    return { adet: 1, kaynak: 'tanım', dizilim: 'tek parça', olcu, kayit: null, etiket: olcu.etiket, secenekler: [1], not: 'Tek parça — bağ yok (1 adet)' };
+  }
+  if (olcu) {
+    const th = bagTahmin(olcu, tablo, opt);
+    if (th) {
+      return {
+        adet: th.adet,
+        kaynak: 'tahmin',
+        dizilim: th.dizilim || '',
+        olcu,
+        kayit: null,
+        etiket: olcu.etiket,
+        secenekler,
+        tahmin: th,
+        not: `Komşu ölçülerden tahmini ≈${th.adet} Boy (${th.ayrinti})`
+      };
+    }
+    // Çok büyük / uzak özel kesitler için ~400×400mm geometrik yedek
+    const a0 = olcu.kind === 'ROUND' ? bagNum(olcu.od) : bagNum(olcu.a);
+    const b0 = olcu.kind === 'ROUND' ? a0 : bagNum(olcu.b);
+    if (a0 > 0 && b0 > 0) {
+      const estN = Math.max(1, (400 * 400) / (a0 * b0));
+      const dz = olcu.kind === 'ROUND' ? yuvarlakDizilim(estN) : kutuDizilim(Math.max(a0, b0), Math.min(a0, b0), estN);
+      return {
+        adet: dz.adet,
+        kaynak: 'tahmin',
+        dizilim: dz.dizilim || '',
+        olcu,
+        kayit: null,
+        etiket: olcu.etiket,
+        secenekler,
+        not: `Geometrik bağ tahmini ≈${dz.adet} Boy${dz.dizilim ? ` (${dz.dizilim})` : ''}`
+      };
+    }
+  }
+  const def = Math.max(1, Math.round(bagNum(opt.varsayilan, 1)));
+  return { adet: def, kaynak: 'varsayılan', dizilim: '', olcu, kayit: null, etiket: olcu ? olcu.etiket : '', secenekler, not: 'Varsayılan bağ adedi' };
+}
+
+function normalizeBagKaydi(r = {}) {
+  let kind = BAG_TURLERI.some((t) => t.code === r.kind) ? r.kind : '';
+  const sizeTxt = String(r.size ?? '').trim();
+  let o = null;
+  if (kind === 'TEK') {
+    o = { kind: 'TEK' };
+  } else {
+    if (sizeTxt) {
+      const bare = /^Ø?\s*(\d+(?:[.,]\d+)?)$/.exec(sizeTxt.replace(/[⌀øΦ]/g, 'Ø'));
+      if (bare && kind === 'SQUARE') o = bagBoxOf(bagNum(bare[1]), bagNum(bare[1]));
+      else if (bare && (kind === 'ROUND' || !kind)) o = bagRoundOf(bagNum(bare[1]));
+      else {
+        const p = bagOlcuCoz(sizeTxt);
+        if (p && p.kind !== 'TEK') o = p.kind === 'ROUND' ? bagRoundOf(p.od) : bagBoxOf(p.a, p.b);
+        else if (p && p.kind === 'TEK') o = { kind: 'TEK' };
+      }
+    }
+    if (!o && kind === 'ROUND' && bagNum(r.od) > 0) o = bagRoundOf(r.od);
+    else if (!o && (kind === 'SQUARE' || kind === 'RECT') && bagNum(r.a) > 0) {
+      o = bagBoxOf(r.a, bagNum(r.b) > 0 ? r.b : r.a);
+    }
+  }
+  if (!o) throw new Error('Geçerli bir ölçü girin (örn: Ø49, 40x20, 70x70)');
+  kind = o.kind;
+  const pcs = Math.max(1, Math.round(bagNum(r.pcs, 1)));
+  return {
+    kind,
+    od: kind === 'ROUND' ? o.od : 0,
+    a: kind === 'SQUARE' || kind === 'RECT' ? o.a : 0,
+    b: kind === 'SQUARE' || kind === 'RECT' ? o.b : 0,
+    pcs,
+    key: bagAnahtari(o),
+    size: kind === 'TEK' ? (sizeTxt || 'SAC PLAKA / TOLE / LAMA') : bagEtiketi(o),
+    note: String(r.note ?? '').trim(),
+    active: r.active !== false
+  };
+}
+
+function bagSirala(rows = []) {
+  const ko = (k) => {
+    const i = BAG_TURLERI.findIndex((t) => t.code === k);
+    return i < 0 ? 9 : i;
+  };
+  return rows.slice().sort((x, y) => ko(x.kind) - ko(y.kind) || bagNum(x.od) - bagNum(y.od) || bagNum(x.a) - bagNum(y.a) || bagNum(x.b) - bagNum(y.b));
+}
+
+function buildDefaultBundleCounts() {
+  return bagSirala(BAG_TOHUM_RAW.map((r) => normalizeBagKaydi(r)));
+}
+
+bundleCounts = buildDefaultBundleCounts();
+
+function resolveMoldBundleInfo(mold) {
+  if (!mold) return { adet: 1, kaynak: 'varsayılan', dizilim: '', not: '', isApprox: false };
+  const query = mold.type === 'Boru'
+    ? { kind: 'ROUND', od: mold.a }
+    : { kind: mold.shape === 'square' || Math.abs(mold.a - (mold.b || mold.a)) < 0.05 ? 'SQUARE' : 'RECT', a: mold.a, b: mold.b || mold.a };
+  const b = bagAdedi(query, bundleCounts, { varsayilan: mold.defaultBag || 36 });
+  if (mold.customBagLocked && mold.defaultBag > 0) {
+    const dz = describeBundleLayout(b.olcu, mold.defaultBag, '');
+    return {
+      adet: mold.defaultBag,
+      kaynak: 'tanım',
+      dizilim: dz,
+      not: `Kalıp özel bağ tanımı: ${mold.defaultBag} Boy`,
+      isApprox: false
+    };
+  }
+  return {
+    adet: b.adet,
+    kaynak: b.kaynak || 'tanım',
+    dizilim: b.dizilim || '',
+    not: b.not || '',
+    isApprox: b.kaynak === 'tahmin',
+    olcu: b.olcu
+  };
+}
+
+function resolveCustomBundleInfo(shape, a, b) {
+  const A = Math.max(0, bagNum(a));
+  const B = Math.max(0, bagNum(b));
+  if (shape === 'sheet' || shape === 'roundbar' || shape === 'angle') {
+    if (shape === 'sheet') {
+      const r = bagAdedi({ kind: 'TEK' }, bundleCounts);
+      return { adet: r.adet, kaynak: r.kaynak, dizilim: r.dizilim, not: r.not, isApprox: false };
+    }
+    if (shape === 'roundbar') {
+      const r = bagAdedi({ kind: 'ROUND', od: A }, bundleCounts, { varsayilan: 1 });
+      return { adet: r.adet, kaynak: r.kaynak, dizilim: r.dizilim, not: r.not, isApprox: r.kaynak === 'tahmin' };
+    }
+    const maxS = Math.max(A, B);
+    const r = bagAdedi({ kind: 'SQUARE', a: maxS, b: maxS }, bundleCounts, { varsayilan: 50 });
+    return { adet: r.adet, kaynak: r.kaynak, dizilim: r.dizilim, not: r.not, isApprox: true };
+  }
+  const query = shape === 'pipe'
+    ? { kind: 'ROUND', od: A }
+    : shape === 'square'
+      ? { kind: 'SQUARE', a: A, b: A }
+      : { kind: 'RECT', a: Math.max(A, B), b: Math.min(A, B) };
+  const res = bagAdedi(query, bundleCounts, { varsayilan: 36 });
+  return {
+    adet: res.adet,
+    kaynak: res.kaynak,
+    dizilim: res.dizilim || '',
+    not: res.not || '',
+    isApprox: res.kaynak === 'tahmin'
+  };
+}
+
+function syncMoldsWithBundleTable(forceUnlock = false) {
+  molds.forEach((m) => {
+    if (forceUnlock) delete m.customBagLocked;
+    const defRef = DEFAULT_MOLDS.find((d) => d.id === m.id);
+    if (defRef && defRef.aliases) m.aliases = defRef.aliases;
+    const info = resolveMoldBundleInfo(m);
+    if (info.adet > 0) {
+      m.defaultBag = info.adet;
+      m.bagSource = info.kaynak;
+      m.bagLayout = info.dizilim || '';
+    }
+  });
+  slitItems.forEach((it) => {
+    if (it.moldId) {
+      const refM = molds.find((x) => x.id === it.moldId);
+      if (refM) it.defaultBag = refM.defaultBag;
+    }
+  });
+}
+
+function ensureBundleSchemaMigrated(sourceData) {
+  const incomingVer = Number(sourceData?.settings?.bundleSchemaVersion) || 0;
+  if (Array.isArray(sourceData?.bundleCounts) && sourceData.bundleCounts.length > 0) {
+    const map = new Map();
+    if (incomingVer < BUNDLE_SCHEMA_VERSION) {
+      buildDefaultBundleCounts().forEach((r) => map.set(r.key, r));
+    }
+    sourceData.bundleCounts.forEach((r) => {
+      try {
+        const nr = normalizeBagKaydi(r);
+        map.set(nr.key, nr);
+      } catch (e) {}
+    });
+    bundleCounts = bagSirala([...map.values()]);
+  } else {
+    bundleCounts = buildDefaultBundleCounts();
+  }
+
+  if (incomingVer < BUNDLE_SCHEMA_VERSION) {
+    syncMoldsWithBundleTable(true);
+    settings.bundleSchemaVersion = BUNDLE_SCHEMA_VERSION;
+    return true;
+  }
+  syncMoldsWithBundleTable(false);
+  return false;
+}
+
 // ==================== 6. AKILLI TEK ARAMA MOTORU (OMNI-SEARCH) ====================
 
 /**
@@ -512,12 +1027,12 @@ function parseSmartQuery(rawQuery) {
       });
     }
 
-    // 2) Boru Çap x Et eşleşmesi (Örn: 60.3x2, 38x1.5, 114x4, 89x3)
+    // 2) Boru Çap x Et eşleşmesi (Örn: 60.3x2, 38x1.5, 49x2, 90x3, 114x4, 140x4)
     if (!wantsBox && n2 <= 12 && n1 >= 15) {
       molds.forEach((m) => {
         if (m.type === 'Boru') {
           const diffDia = Math.abs(m.a - n1);
-          if (diffDia <= 1.2) {
+          if (diffDia <= NOMINAL_TOL) {
             let score = 185 - diffDia * 10;
             if (wantsPipe) score += 20;
             if (preferredLine === m.line) score += 20;
@@ -577,7 +1092,7 @@ function parseSmartQuery(rawQuery) {
     return { results: results.slice(0, 10), exactAuto: results.length > 0 && results[0].score >= 175 };
   }
 
-  // Genel Metin / Tek Sayı Araması (Örn: "38", "60", "kare", "2 parmak")
+  // Genel Metin / Tek Sayı Araması (Örn: "38", "49", "90", "60", "kare", "2 parmak")
   const rawLower = rawQuery.toLowerCase().trim().replace(/,/g, '.');
   molds.forEach((m) => {
     const hay = `${m.label} ${m.kalip} ${m.type} ${m.aliases || ''} ${m.line}h`.toLowerCase().replace(/,/g, '.');
@@ -585,7 +1100,7 @@ function parseSmartQuery(rawQuery) {
 
     if (nums.length === 1) {
       const n = nums[0];
-      if (m.type === 'Boru' && Math.abs(m.a - n) <= 1.1) score += 150 - Math.abs(m.a - n) * 15;
+      if (m.type === 'Boru' && Math.abs(m.a - n) <= NOMINAL_TOL) score += 150 - Math.abs(m.a - n) * 15;
       if (m.shape === 'square' && Math.abs(m.a - n) < 0.2) score += 148;
       if (m.a === n || m.b === n) score += 95;
       if (m.kalip.replace(',', '.').startsWith(String(n))) score += 85;
@@ -679,18 +1194,24 @@ function renderOmniDropdown() {
   dd.innerHTML = omniMatchesCache.map((item, idx) => {
     const activeCls = idx === omniHighlightIdx ? 'highlighted' : '';
     if (item.type === 'custom') {
+      const cb = resolveCustomBundleInfo(item.shape, item.a, item.b || item.a);
+      const cbInfo = `1 Bağ: ${cb.isApprox ? '≈' : ''}${cb.adet} Boy • ~${item.strip}mm`;
       return `
         <button type="button" class="omni-item ${activeCls}" onclick="applyOmniByIndex(${idx})">
           <div>
             <span class="badge badge-purple">ÖZEL KESİT</span>
             <strong style="margin-left:6px;">${escapeHtml(item.label)}</strong>
           </div>
-          <span class="mono badge badge-amber">Bant: ~${item.strip} mm</span>
+          <span class="mono badge badge-amber">${escapeHtml(cbInfo)}</span>
         </button>
       `;
     }
     const m = item.mold;
-    const wInfo = item.wall ? `${item.wall} mm Et → ${item.strip} mm Bant` : `1 Bağ: ${m.defaultBag} Boy`;
+    const approxSym = m.bagSource === 'tahmin' ? '≈' : '';
+    const laySuffix = m.bagLayout ? ` (${m.bagLayout})` : '';
+    const wInfo = item.wall
+      ? `${item.wall}mm Et → ${item.strip}mm • ${approxSym}${m.defaultBag} Boy/Bağ`
+      : `1 Bağ: ${approxSym}${m.defaultBag} Boy${laySuffix}`;
     const lineCls = m.line === '63' ? 'badge-blue' : 'badge-purple';
     return `
       <button type="button" class="omni-item ${activeCls}" onclick="applyOmniByIndex(${idx})">
@@ -724,6 +1245,10 @@ function applyOmniResult(item, closeDropdown = true) {
     document.getElementById('inputDimB').value = item.b || item.a;
     document.getElementById('inputWall').value = item.wall;
     document.getElementById('inputStripWidth').value = item.strip;
+    const cb = resolveCustomBundleInfo(item.shape, item.a, item.b || item.a);
+    document.getElementById('inputPcsPerBundle').value = cb.adet;
+    const curBundles = Math.max(0.1, parseFloat(document.getElementById('inputBundleCount').value) || 1);
+    document.getElementById('inputTotalPieces').value = Math.max(1, Math.round(curBundles * cb.adet));
     stripSourceInfo = 'Algoritmik Özel Kesit';
     updateCustomShapeUI();
     renderWallButtons();
@@ -738,6 +1263,16 @@ function applyOmniResult(item, closeDropdown = true) {
   if (closeDropdown) {
     hideOmniDropdown();
     showToast(`${item.type === 'custom' ? item.label : item.mold.label} otomatik seçildi.`);
+  }
+}
+
+function quickOmniPreset(queryStr) {
+  const inp = document.getElementById('omniSearchInput');
+  if (inp) inp.value = queryStr;
+  document.getElementById('btnClearOmni')?.classList.remove('hidden');
+  const parsed = parseSmartQuery(queryStr);
+  if (parsed && parsed.results.length > 0) {
+    applyOmniResult(parsed.results[0], true);
   }
 }
 
@@ -776,25 +1311,36 @@ function setCatalogFilter(line, type) {
       if (b) b.classList.toggle('active', t === catalogTypeFilter);
     });
   }
+  if (catalogCollapsed) toggleCatalogCollapse(false);
   renderCatalogGrid(document.getElementById('omniSearchInput').value);
 }
 
-function toggleCatalogCollapse() {
-  catalogCollapsed = !catalogCollapsed;
-  document.getElementById('catalogCollapsible').classList.toggle('hidden', catalogCollapsed);
-  document.getElementById('btnToggleCatalog').innerText = catalogCollapsed ? 'Kalıp Listesini Göster' : 'Kalıp Listesini Gizle';
+function syncCatalogCollapseUI() {
+  const colEl = document.getElementById('catalogCollapsible');
+  const btnEl = document.getElementById('btnToggleCatalog');
+  if (colEl) colEl.classList.toggle('hidden', catalogCollapsed);
+  if (btnEl) {
+    btnEl.innerHTML = catalogCollapsed
+      ? `📋 Kalıplar (<span id="lblTotalMoldCount">${molds.length}</span>) ▾`
+      : `📋 Gizle (<span id="lblTotalMoldCount">${molds.length}</span>) ▴`;
+  }
+}
+
+function toggleCatalogCollapse(forceState) {
+  catalogCollapsed = typeof forceState === 'boolean' ? forceState : !catalogCollapsed;
+  syncCatalogCollapseUI();
 }
 
 function renderCatalogGrid(filterText = '') {
   const grid = document.getElementById('moldCatalogGrid');
-  document.getElementById('lblTotalMoldCount').innerText = molds.length;
+  const cntEl = document.getElementById('lblTotalMoldCount');
+  if (cntEl) cntEl.innerText = molds.length;
   const q = (filterText || '').toLowerCase().trim().replace(/,/g, '.');
 
   const filtered = molds.filter((m) => {
     if (catalogLineFilter !== 'ALL' && m.line !== catalogLineFilter) return false;
     if (catalogTypeFilter !== 'ALL' && m.type !== catalogTypeFilter) return false;
     if (q) {
-      // Eğer çoklu ölçü girildiyse (örn 40x20x1.5) ilk ölçü kısmını da eşle
       const baseQ = q.split(/[x*\s]/)[0];
       const hay = `${m.label} ${m.kalip} ${m.aliases || ''}`.toLowerCase().replace(/,/g, '.');
       if (!hay.includes(q) && (!baseQ || !hay.includes(baseQ))) return false;
@@ -805,20 +1351,22 @@ function renderCatalogGrid(filterText = '') {
   grid.innerHTML = filtered.map((m) => {
     const sel = !isCustomMode && activeMold && activeMold.id === m.id;
     const badgeCls = m.line === '63' ? 'badge-blue' : 'badge-purple';
+    const approxSym = m.bagSource === 'tahmin' ? '≈' : '';
+    const laySuffix = m.bagLayout ? ` (${escapeHtml(m.bagLayout)})` : '';
     return `
-      <button type="button" onclick="selectMold('${m.id}')" class="mold-card ${sel ? 'selected' : ''}">
+      <button type="button" onclick="selectMold('${m.id}', null, true)" class="mold-card ${sel ? 'selected' : ''}">
         <div class="row-between" style="width:100%;">
-          <span class="badge ${badgeCls}" style="font-size:0.64rem;padding:1px 5px;">${m.line}H • ${escapeHtml(m.kalip)}</span>
+          <span class="badge ${badgeCls}" style="font-size:0.63rem;padding:1px 5px;">${m.line}H • ${escapeHtml(m.kalip)}</span>
           ${m.note ? '<span title="' + escapeHtml(m.note) + '" style="font-size:0.72rem;">⚠️</span>' : ''}
         </div>
         <div style="font-weight:800;font-size:0.86rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;">${escapeHtml(m.label)}</div>
-        <div class="mono text-muted" style="font-size:0.7rem;">Bağ: <b>${m.defaultBag}</b> Boy</div>
+        <div class="mono text-muted" style="font-size:0.68rem;">Bağ: <b>${approxSym}${m.defaultBag}</b> Boy${laySuffix}</div>
       </button>
     `;
   }).join('');
 }
 
-function selectMold(moldId, explicitWall = null) {
+function selectMold(moldId, explicitWall = null, fromCatalogTap = false) {
   const m = molds.find((x) => x.id === moldId);
   if (!m) return;
 
@@ -827,6 +1375,17 @@ function selectMold(moldId, explicitWall = null) {
   document.getElementById('customDimensionsPanel').classList.add('hidden');
   document.getElementById('btnCustomMode').classList.remove('btn-primary');
   document.getElementById('btnCustomMode').classList.add('btn-outline');
+
+  if (fromCatalogTap && typeof window.innerWidth === 'number' && window.innerWidth < 768) {
+    toggleCatalogCollapse(true);
+  }
+
+  const bagInfo = resolveMoldBundleInfo(m);
+  if (bagInfo.adet > 0) {
+    m.defaultBag = bagInfo.adet;
+    m.bagSource = bagInfo.kaynak;
+    m.bagLayout = bagInfo.dizilim || '';
+  }
 
   document.getElementById('inputDimA').value = m.a;
   document.getElementById('inputDimB').value = m.b || m.a;
@@ -900,7 +1459,12 @@ function onCustomDimInput() {
   const t = parseFloat(document.getElementById('inputWall').value) || 1.5;
   const est = computeCustomStrip(customShape, a, b, t);
   document.getElementById('inputStripWidth').value = est;
+  const cb = resolveCustomBundleInfo(customShape, a, b);
+  document.getElementById('inputPcsPerBundle').value = cb.adet;
+  const curBundles = Math.max(0.1, parseFloat(document.getElementById('inputBundleCount').value) || 1);
+  document.getElementById('inputTotalPieces').value = Math.max(1, Math.round(curBundles * cb.adet));
   stripSourceInfo = 'Algoritmik Özel Kesit';
+  renderWallButtons();
   recalculateMain();
 }
 
@@ -1006,6 +1570,21 @@ function onPcsPerBundleInput() {
   const bundles = Math.max(0, parseFloat(document.getElementById('inputBundleCount').value) || 1);
   document.getElementById('inputTotalPieces').value = Math.max(1, Math.round(pcsPerBag * bundles));
   recalculateMain();
+}
+
+function resetCurrentBundleCountToDefault() {
+  const bagInfo = !isCustomMode && activeMold
+    ? resolveMoldBundleInfo(activeMold)
+    : resolveCustomBundleInfo(
+        customShape,
+        parseFloat(document.getElementById('inputDimA').value) || 40,
+        parseFloat(document.getElementById('inputDimB').value) || 20
+      );
+  document.getElementById('inputPcsPerBundle').value = bagInfo.adet;
+  const curBundles = Math.max(0.1, parseFloat(document.getElementById('inputBundleCount').value) || 1);
+  document.getElementById('inputTotalPieces').value = Math.max(1, Math.round(curBundles * bagInfo.adet));
+  recalculateMain();
+  showToast(`📦 1 Bağ Adedi standart değere döndürüldü: ${bagInfo.isApprox ? '≈' : ''}${bagInfo.adet} Boy${bagInfo.dizilim ? ' (' + bagInfo.dizilim + ')' : ''}`);
 }
 
 function onBundleCountInput() {
@@ -1196,14 +1775,41 @@ function computeCurrentState() {
 function recalculateMain(syncInactivePriceInput = true) {
   const c = computeCurrentState();
   const max63 = settings.max63Wall || 2.9;
+  const bagInfo = !isCustomMode && activeMold
+    ? resolveMoldBundleInfo(activeMold)
+    : resolveCustomBundleInfo(
+        c.shape,
+        parseFloat(document.getElementById('inputDimA').value) || 0,
+        parseFloat(document.getElementById('inputDimB').value) || 0
+      );
+
+  // 1 Bağ Dizilim / Kaynak Etiketi
+  const bagTagEl = document.getElementById('lblBagSourceTag');
+  if (bagTagEl) {
+    if (c.pcsPerBundle !== bagInfo.adet) {
+      bagTagEl.className = 'mono text-amber';
+      bagTagEl.innerText = `Manuel ↺ (${bagInfo.adet})`;
+      bagTagEl.title = `Standart 1 Bağ: ${bagInfo.isApprox ? '≈' : ''}${bagInfo.adet} Boy${bagInfo.dizilim ? ' (' + bagInfo.dizilim + ')' : ''} — Varsayılana dönmek için dokunun`;
+    } else if (bagInfo.isApprox) {
+      bagTagEl.className = 'mono text-amber';
+      bagTagEl.innerText = `≈ ${bagInfo.dizilim || 'Tahmin'}`;
+      bagTagEl.title = bagInfo.not || 'Komşu kalıp ölçülerinden hesaplanan tahmini bağ dizilimi';
+    } else {
+      bagTagEl.className = 'mono text-emerald';
+      bagTagEl.innerText = bagInfo.dizilim || 'Tanım';
+      bagTagEl.title = bagInfo.not || 'Fabrika Kalıp Listesi standart bağ dizilimi';
+    }
+  }
 
   // Başlık ve Hat Kuralları
+  const approxSym = bagInfo.isApprox ? '≈' : '';
+  const layMetaTxt = bagInfo.dizilim ? ` (${bagInfo.dizilim})` : '';
   if (!isCustomMode && activeMold) {
     document.getElementById('selectedProfileTitle').innerText = `${activeMold.label} • ${activeMold.kalip} Kalıp`;
-    document.getElementById('selectedProfileMeta').innerText = `${activeMold.line} Hat Üretim • 1 Bağ Standart: ${activeMold.defaultBag} Boy`;
+    document.getElementById('selectedProfileMeta').innerText = `${activeMold.line} Hat Üretim • 1 Bağ Standart: ${approxSym}${bagInfo.adet} Boy${layMetaTxt}`;
   } else {
     document.getElementById('selectedProfileTitle').innerText = c.specLabel;
-    document.getElementById('selectedProfileMeta').innerText = 'Serbest Özel Kesit • Algoritmik Bant & Kesit Hesabı';
+    document.getElementById('selectedProfileMeta').innerText = `Serbest Özel Kesit • 1 Bağ: ${approxSym}${bagInfo.adet} Boy${layMetaTxt}`;
   }
 
   document.getElementById('stripSourceBadge').innerText = stripSourceInfo;
@@ -1241,6 +1847,7 @@ function recalculateMain(syncInactivePriceInput = true) {
   }
 
   // Ağırlık KPI Kartları
+  const activeLaySuffix = c.pcsPerBundle === bagInfo.adet && bagInfo.dizilim ? ` (${bagInfo.dizilim})` : '';
   document.getElementById('kpiActiveSpecBadge').innerText = `${c.specLabel} • ${c.length}m`;
   document.getElementById('kpiKgPerMeter').innerText = `${fmt(c.weightPerMeter, 3)} kg/m`;
   document.getElementById('kpiStripFormula').innerText = c.method === 'strip' && c.shape !== 'roundbar'
@@ -1249,16 +1856,17 @@ function recalculateMain(syncInactivePriceInput = true) {
   document.getElementById('kpiKgPerPiece').innerText = `${fmt(c.weightPerPiece, 2)} kg/Boy`;
   document.getElementById('kpiLengthSub').innerText = `${c.length} Metre / Boy`;
   document.getElementById('kpiKgPerBundle').innerText = `${fmt(c.weightPerBundle, 2)} kg`;
-  document.getElementById('kpiPcsPerBundleSub').innerText = `${c.pcsPerBundle} Boy / Bağ`;
+  document.getElementById('kpiPcsPerBundleSub').innerText = `${c.pcsPerBundle} Boy / Bağ${activeLaySuffix}`;
   document.getElementById('kpiTotalKg').innerText = `${fmt(c.totalWeight, 2)} kg`;
   document.getElementById('kpiTotalTonAndMeters').innerText = `${fmt(c.totalWeight / 1000, 2)} Ton • ${fmt(c.totalMeters, 0)} m`;
 
   // Bağ dağılımı + EN 10219 karşılaştırması
   const fullBags = Math.floor(c.totalPieces / c.pcsPerBundle);
   const loosePcs = c.totalPieces % c.pcsPerBundle;
+  const layInline = c.pcsPerBundle === bagInfo.adet && bagInfo.dizilim ? ` • ${escapeHtml(bagInfo.dizilim)}` : '';
   const bagDesc = fullBags > 0
-    ? `📦 Paket: <b>${fullBags} Tam Bağ</b>${loosePcs > 0 ? ` + <b>${loosePcs} Açık Boy</b>` : ''} (${c.totalPieces} Boy)`
-    : `📦 Paket: <b>${c.totalPieces} Açık Boy</b> (Paket Altı)`;
+    ? `📦 Paket: <b>${fullBags} Tam Bağ</b>${loosePcs > 0 ? ` + <b>${loosePcs} Açık Boy</b>` : ''} (${c.totalPieces} Boy${layInline})`
+    : `📦 Paket: <b>${c.totalPieces} Açık Boy</b> (Paket Altı • 1 Bağ=${c.pcsPerBundle})`;
   document.getElementById('lblBundleBreakdown').innerHTML = bagDesc;
   document.getElementById('lblGeoCompare').innerText = `EN 10219 Teorik: ${fmt(c.kgPerMeterEN, 3)} kg/m`;
 
@@ -1315,6 +1923,34 @@ function recalculateMain(syncInactivePriceInput = true) {
     document.getElementById('kpiSecondaryVatLine').innerText = `+%${c.vatRate} Dahil (TTC): ${fmt(c.grandTotalTTC, 2)} ${c.currency}`;
   }
   document.getElementById('kpiBundlePriceLine').innerText = `1 Bağ: ${fmt(c.netBundlePrice, 2)} ${c.currency}`;
+
+  // Mobil Canlı Özet Barı Güncellemesi
+  const mobSpec = document.getElementById('mobBarSpec');
+  const mobUnit = document.getElementById('mobBarUnitWt');
+  const mobTotWt = document.getElementById('mobBarTotalWt');
+  const mobTotPr = document.getElementById('mobBarTotalPrice');
+  const mobBtn = document.getElementById('mobBarActionBtn');
+  if (mobSpec) {
+    mobSpec.innerText = `${c.specLabel} (${c.totalPieces} Boy)`;
+    mobUnit.innerText = `${fmt(c.weightPerPiece, 2)} kg/Boy`;
+    mobTotWt.innerText = `${fmt(c.totalWeight, 1)} kg`;
+    const activeTotal = showVatIncluded ? c.grandTotalTTC : c.netSubTotalHT;
+    if (hasPerm('viewPrices')) {
+      mobTotPr.classList.remove('hidden');
+      mobTotPr.innerText = `• ${fmt(activeTotal, 0)} ${c.currency}`;
+      mobBtn.innerText = '➕ Ekle';
+      mobBtn.onclick = addCurrentToQuote;
+    } else {
+      mobTotPr.classList.add('hidden');
+      mobBtn.innerText = '✂️ Dilme';
+      mobBtn.onclick = sendCurrentMoldToSlitter;
+    }
+  }
+}
+
+function scrollToPricingOnMobile() {
+  const target = document.getElementById(hasPerm('viewPrices') ? 'pricingCard' : 'kpiTotalKg');
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function setPricingBasis(basis) {
@@ -1453,8 +2089,12 @@ function initFirebaseConnection() {
       if (data && data.rolePermissions) {
         rolePermissions = { ...cloneObj(DEFAULT_PERMISSIONS), ...data.rolePermissions };
       }
+      const migrated = ensureBundleSchemaMigrated(data || {});
       saveLocalMasterCache();
       refreshAllViewsAfterConfigUpdate();
+      if (migrated) {
+        syncMasterConfigToFirebase();
+      }
     }, () => {
       updateFirebaseBadgeUI(false);
     });
@@ -1482,13 +2122,13 @@ function updateFirebaseBadgeUI(isOnline) {
   if (!fbBadge) return;
   if (firebaseConnected && isOnline) {
     fbBadge.className = 'badge badge-emerald';
-    fbBadge.innerText = '☁️ Firebase Canlı';
+    fbBadge.innerText = '☁️ Canlı';
   } else if (firebaseConnected && !isOnline) {
     fbBadge.className = 'badge badge-amber';
-    fbBadge.innerText = '☁️ Firebase Çevrimdışı Önbellek';
+    fbBadge.innerText = '☁️ Önbellek';
   } else {
     fbBadge.className = 'badge badge-neutral';
-    fbBadge.innerText = '💾 Yerel Hafıza';
+    fbBadge.innerText = '💾 Yerel';
   }
 }
 
@@ -1500,6 +2140,7 @@ async function syncMasterConfigToFirebase() {
     await firestoreDb.collection('erp_config').doc('master').set({
       settings,
       molds,
+      bundleCounts,
       users,
       rolePermissions,
       updatedAt: new Date().toISOString(),
@@ -1680,39 +2321,34 @@ function renderQuoteView() {
         : '<span class="badge badge-emerald">KG BAZLI</span>';
 
       return `
-        <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:10px 12px;">
-          <div class="row-between" style="margin-bottom:6px;">
-            <div class="row-wrap">
+        <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;padding:10px 11px;">
+          <div class="row-between" style="margin-bottom:8px;">
+            <div class="row-wrap" style="gap:5px;">
               <span class="badge badge-neutral mono">#${idx + 1}</span>
-              <strong style="font-size:0.9rem;">${escapeHtml(it.specLabel)} (${it.length || 6}m)</strong>
-              <span class="badge badge-amber mono">Bant: ${it.stripWidth}mm</span>
+              <strong style="font-size:0.88rem;">${escapeHtml(it.specLabel)} (${it.length || 6}m)</strong>
+              <span class="badge badge-amber mono">Bant:${it.stripWidth}</span>
               ${basisBadge}
             </div>
             <button onclick="removeQuoteItem(${it.id})" class="btn btn-danger btn-sm" title="Kalemi Sil">✕</button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;align-items:center;font-size:0.78rem;">
-            <div>
-              <span class="text-muted">Miktar (Boy):</span>
-              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
-                <input type="number" value="${it.totalPieces}" min="1" onchange="updateQuoteItemQty(${it.id}, this.value)" class="mono" style="width:74px;padding:4px 6px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);font-weight:800;">
-                <span class="text-muted">(${bagTxt})</span>
+          <div class="grid-2" style="gap:7px;">
+            <div class="field" style="background:var(--surface);">
+              <label class="field-label"><span>Miktar (Boy)</span><span>${bagTxt}</span></label>
+              <input type="number" value="${it.totalPieces}" min="1" inputmode="numeric" onchange="updateQuoteItemQty(${it.id}, this.value)" class="field-input mono text-primary">
+            </div>
+            <div class="field" style="background:var(--surface);">
+              <label class="field-label"><span>Kantar Tonaj</span><span>HT Tutar</span></label>
+              <div class="mono fw-800" style="font-size:0.86rem;padding-top:3px;">
+                ${fmt(it.totalWeight, 1)} kg • <span class="text-emerald">${fmt(it.subTotalPrice, 0)} ${it.currency}</span>
               </div>
             </div>
-            <div>
-              <span class="text-muted">Kantar Ağırlığı:</span>
-              <div class="mono fw-800" style="margin-top:2px;">${fmt(it.totalWeight, 2)} kg</div>
+            <div class="field" style="background:var(--surface);">
+              <label class="field-label"><span>1 Kg Fiyatı</span><span>${it.currency}/kg</span></label>
+              <input type="number" value="${roundDec(it.kgPrice, 2)}" step="0.5" inputmode="decimal" onchange="updateQuoteItemUnitPrice(${it.id}, this.value, 'KG')" class="field-input mono">
             </div>
-            <div>
-              <span class="text-muted">Kg Fiyatı (${it.currency}):</span>
-              <input type="number" value="${roundDec(it.kgPrice, 2)}" step="0.5" onchange="updateQuoteItemUnitPrice(${it.id}, this.value, 'KG')" class="mono" style="width:92px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:700;margin-top:2px;">
-            </div>
-            <div>
-              <span class="text-muted">1 Boy Fiyatı (${it.currency}):</span>
-              <input type="number" value="${roundDec(it.pricePerPiece, 2)}" step="1" onchange="updateQuoteItemUnitPrice(${it.id}, this.value, 'PIECE')" class="mono" style="width:98px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-weight:700;margin-top:2px;">
-            </div>
-            <div style="text-align:right;">
-              <span class="text-muted">Tutar (HT):</span>
-              <div class="mono fw-800 text-emerald" style="font-size:0.95rem;margin-top:2px;">${fmt(it.subTotalPrice, 2)} ${it.currency}</div>
+            <div class="field" style="background:var(--surface);">
+              <label class="field-label"><span>1 Boy Fiyatı</span><span>${it.currency}/Boy</span></label>
+              <input type="number" value="${roundDec(it.pricePerPiece, 2)}" step="1" inputmode="decimal" onchange="updateQuoteItemUnitPrice(${it.id}, this.value, 'PIECE')" class="field-input mono">
             </div>
           </div>
         </div>
@@ -2371,6 +3007,8 @@ function sendSlitRowToQuote(itemId) {
   const pcs6m = Math.max(1, Math.floor(rowKg / (wtPer6m || 1)));
   const kgPrice = parseFloat(document.getElementById('inputKgPrice').value) || settings.defaultKgPrice || 145;
   const currency = document.getElementById('selectCurrency').value || settings.defaultCurrency || 'DA';
+  const refMold = it.moldId ? molds.find((x) => x.id === it.moldId) : null;
+  const resolvedPcsPerBundle = refMold ? refMold.defaultBag : (it.defaultBag || bagAdedi(it.label, bundleCounts, { varsayilan: 36 }).adet);
 
   quoteItems.push({
     id: Date.now() + Math.floor(Math.random() * 1000),
@@ -2379,7 +3017,7 @@ function sendSlitRowToQuote(itemId) {
     stripWidth: it.stripWidth,
     wall: t,
     length: 6,
-    pcsPerBundle: it.defaultBag || 30,
+    pcsPerBundle: resolvedPcsPerBundle,
     totalPieces: pcs6m,
     weightPerPiece: wtPer6m,
     totalWeight: pcs6m * wtPer6m,
@@ -2442,13 +3080,18 @@ function renderSlitWorkspace() {
   let usedBandsKg = 0;
 
   const tbody = document.getElementById('slitTableBody');
+  const mobCards = document.getElementById('slitMobileCards');
   const vBar = document.getElementById('slitVisualBar');
   vBar.innerHTML = '';
 
   if (slitItems.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:20px;">Henüz bant eklenmedi. "Otomatik Minimum Fire Planla" veya "+ Ruloya Ekle" butonunu kullanın.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:20px;">Henüz bant eklenmedi. "Otomatik Planla" veya "+ Ruloya Bant Ekle" butonunu kullanın.</td></tr>`;
+    if (mobCards) {
+      mobCards.innerHTML = `<div style="text-align:center;padding:18px;border:1px dashed var(--border-strong);border-radius:10px;color:var(--text-muted);font-size:0.8rem;">Henüz bant eklenmedi. <b>Otomatik Planla</b> veya <b>+ Ruloya Bant Ekle</b> butonunu kullanın.</div>`;
+    }
   } else {
     let cursorMm = 0;
+    const mobileHtmlArr = [];
     tbody.innerHTML = slitItems.map((it, idx) => {
       const rowMm = roundDec(it.stripWidth * it.count, 2);
       const oneBandKg = it.stripWidth * kgPerMm;
@@ -2456,7 +3099,9 @@ function renderSlitWorkspace() {
       const sharePct = (rowMm / coilW) * 100;
       const wtPer6m = ((it.stripWidth * t * density) / 1000) * 6;
       const pipes6m = wtPer6m > 0 ? Math.floor(rowKg / wtPer6m) : 0;
-      const bags6m = (pipes6m / Math.max(1, it.defaultBag || 30)).toFixed(1);
+      const refMold = it.moldId ? molds.find((x) => x.id === it.moldId) : null;
+      const effBag = refMold ? refMold.defaultBag : (it.defaultBag || 36);
+      const bags6m = (pipes6m / Math.max(1, effBag)).toFixed(1);
 
       const startMm = cursorMm;
       cursorMm = roundDec(cursorMm + rowMm, 1);
@@ -2473,6 +3118,32 @@ function renderSlitWorkspace() {
       seg.title = `${it.label}: ${it.count}×${it.stripWidth}mm = ${rowMm}mm [${startMm}→${cursorMm}mm] (${fmt(rowKg, 1)} kg)`;
       seg.innerText = `${it.count}×${it.stripWidth}`;
       vBar.appendChild(seg);
+
+      mobileHtmlArr.push(`
+        <div style="background:var(--surface-alt);border:1px solid var(--border);border-left:4px solid ${color};border-radius:10px;padding:10px;">
+          <div class="row-between" style="margin-bottom:6px;">
+            <div style="min-width:0;">
+              <strong style="font-size:0.88rem;">${escapeHtml(it.label)}</strong>
+              <div class="mono text-muted" style="font-size:0.7rem;">${it.line}H • Bant: <b class="text-amber">${it.stripWidth} mm</b> • [${startMm}–${cursorMm}mm]</div>
+            </div>
+            <div class="row-wrap" style="gap:4px;">
+              <button onclick="sendSlitRowToQuote(${it.id})" class="btn btn-outline btn-sm" title="Teklife Gönder">📋</button>
+              <button onclick="removeSlitItem(${it.id})" class="btn btn-danger btn-sm" title="Sil">✕</button>
+            </div>
+          </div>
+          <div class="row-between" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 8px;">
+            <div class="stepper">
+              <button onclick="stepSlitCount(${it.id}, -1)" class="step-btn">−</button>
+              <span class="mono fw-800" style="min-width:48px;text-align:center;font-size:0.86rem;">${it.count} Dilim</span>
+              <button onclick="stepSlitCount(${it.id}, 1)" class="step-btn">+</button>
+            </div>
+            <div style="text-align:right;" class="mono">
+              <div class="fw-800 text-emerald" style="font-size:0.86rem;">${fmt(rowKg, 1)} kg <span class="text-muted" style="font-size:0.7rem;">(${rowMm}mm)</span></div>
+              <div class="text-muted" style="font-size:0.7rem;">~${pipes6m} Boy (${bags6m} Bağ)</div>
+            </div>
+          </div>
+        </div>
+      `);
 
       return `
         <tr>
@@ -2506,6 +3177,7 @@ function renderSlitWorkspace() {
         </tr>
       `;
     }).join('');
+    if (mobCards) mobCards.innerHTML = mobileHtmlArr.join('');
   }
 
   const remUsableMm = roundDec(usableCoilMm - usedBandsMm, 2);
@@ -3046,6 +3718,10 @@ function detectAndExtractSpreadsheetPayload(sheets) {
           if (!isFinite(dimB)) dimB = type === 'Boru' ? 0 : dimA;
 
           const shape = type === 'Boru' ? 'pipe' : (Math.abs(dimA - dimB) < 0.05 ? 'square' : 'box');
+          const parsedBagCell = colBag !== -1 ? parseInt(row[colBag]) : NaN;
+          const autoBag = resolveCustomBundleInfo(shape, dimA, type === 'Boru' ? 0 : dimB);
+          const finalBag = isFinite(parsedBagCell) && parsedBagCell >= 1 ? parsedBagCell : autoBag.adet;
+          const isLocked = isFinite(parsedBagCell) && parsedBagCell >= 1 && parsedBagCell !== autoBag.adet;
           importedMolds.push({
             id: `${line}_${importedMolds.length + 1}_${Date.now() % 10000}`,
             line,
@@ -3056,7 +3732,10 @@ function detectAndExtractSpreadsheetPayload(sheets) {
             aliases: '',
             a: dimA,
             b: type === 'Boru' ? 0 : dimB,
-            defaultBag: Math.max(1, parseInt(row[colBag]) || 30),
+            defaultBag: finalBag,
+            bagSource: isLocked ? 'tanım' : autoBag.kaynak,
+            bagLayout: isLocked ? describeBundleLayout(bagOlcuCoz(type === 'Boru' ? `Ø${dimA}` : `${dimA}x${dimB}`), finalBag, '') : autoBag.dizilim,
+            ...(isLocked ? { customBagLocked: true } : {}),
             note: colNot !== -1 ? String(row[colNot] || '').trim() : '',
             strips
           });
@@ -3100,6 +3779,7 @@ function detectAndExtractSpreadsheetPayload(sheets) {
         const b = type === 'Boru' ? 0 : (nums[1] || a);
         const shape = type === 'Boru' ? 'pipe' : (Math.abs(a - b) < 0.05 ? 'square' : 'box');
         const label = type === 'Boru' ? `Ø${lastKalip.replace(/Ø/gi, '')} Boru` : `${a}x${b}`;
+        const autoBag = resolveCustomBundleInfo(shape, a, b);
 
         importedMolds.push({
           id: `${line}_${importedMolds.length + 1}_imp`,
@@ -3111,7 +3791,9 @@ function detectAndExtractSpreadsheetPayload(sheets) {
           aliases: '',
           a,
           b,
-          defaultBag: 30,
+          defaultBag: autoBag.adet,
+          bagSource: autoBag.kaynak,
+          bagLayout: autoBag.dizilim,
           note: '',
           strips
         });
@@ -3149,6 +3831,7 @@ function detectAndExtractSpreadsheetPayload(sheets) {
       const bCount = parseInt(String(row[2] || '').trim());
       const bLabel = String(row[3] || '').trim();
       if (c0 !== 'FİRE' && c0 !== 'TOPLAM' && isFinite(bWidth) && bWidth >= 30 && bWidth <= 800 && isFinite(bCount) && bCount >= 1 && bCount <= 40) {
+        const slBag = bagAdedi(bLabel, bundleCounts, { varsayilan: 36 }).adet;
         bands.push({
           id: Date.now() + bands.length,
           moldId: '',
@@ -3156,7 +3839,7 @@ function detectAndExtractSpreadsheetPayload(sheets) {
           line: thick <= (settings.max63Wall || 2.9) ? '63' : '140',
           stripWidth: bWidth,
           count: bCount,
-          defaultBag: 30
+          defaultBag: slBag
         });
       }
     });
@@ -3183,8 +3866,11 @@ function detectAndExtractSpreadsheetPayload(sheets) {
     const best = smart.results[0];
     const rowLen = parseFloat(String(row[2] || '').replace(',', '.'));
     const lengthM = isFinite(rowLen) && rowLen >= 1 && rowLen <= 24 ? rowLen : (best.length || 6);
+    const resolvedBag = best.mold
+      ? resolveMoldBundleInfo(best.mold).adet
+      : resolveCustomBundleInfo(best.shape || 'box', best.a || 40, best.b || 20).adet;
     const rawQty = parseFloat(String(row[3] || row[1] || '').replace(',', '.'));
-    const qtyPieces = isFinite(rawQty) && rawQty >= 1 ? Math.round(rawQty) : (best.mold ? best.mold.defaultBag : 60);
+    const qtyPieces = isFinite(rawQty) && rawQty >= 1 ? Math.round(rawQty) : resolvedBag;
     const basisCell = String(row[4] || '').toUpperCase();
     const basis = basisCell.includes('BOY') || basisCell.includes('ADET') ? 'PIECE' : 'KG';
     const rawUnitPrice = parseFloat(String(row[5] || '').replace(',', '.'));
@@ -3218,7 +3904,7 @@ function detectAndExtractSpreadsheetPayload(sheets) {
       stripWidth: strip,
       wall,
       length: lengthM,
-      pcsPerBundle: mold ? mold.defaultBag : 30,
+      pcsPerBundle: resolvedBag,
       totalPieces: qtyPieces,
       weightPerPiece: wtPiece,
       totalWeight: totWt,
@@ -3379,6 +4065,7 @@ function applyPendingUpload() {
     if (Array.isArray(p.data.quoteItems)) quoteItems = p.data.quoteItems;
     if (Array.isArray(p.data.savedQuotes)) savedQuotes = p.data.savedQuotes;
     if (Array.isArray(p.data.slitItems) && p.data.slitItems.length) slitItems = p.data.slitItems;
+    ensureBundleSchemaMigrated(p.data);
     syncMasterConfigToFirebase();
     saveAppState();
     refreshAllViewsAfterConfigUpdate();
@@ -3392,6 +4079,7 @@ function applyPendingUpload() {
       return;
     }
     molds = p.molds;
+    syncMoldsWithBundleTable(false);
     activeMold = molds[0] || null;
     syncMasterConfigToFirebase();
     refreshAllViewsAfterConfigUpdate();
@@ -3441,11 +4129,11 @@ function downloadMoldDatabaseExcel() {
 function downloadSampleOrderExcel() {
   const rows = [
     ['Profil Ölçüsü (Tek Arama Formatı)', 'Açıklama', 'Boy (m)', 'Miktar (Boy Adedi)', 'Fiyat Bazı (KG / BOY)', 'Birim Fiyat'],
-    ['40x20x1.5', 'Kutu Profil', 6, 120, 'KG', 145],
-    ['50x50x2', 'Kare Profil', 6, 100, 'BOY', 1850],
-    ['60,3 boru 2.5', 'Sanayi Borusu', 6, 74, 'KG', 148],
-    ['80x40x3', '140 Hat Kutu', 6, 60, 'KG', 150],
-    ['100x100x4', 'Ağır Kutu Profil', 6, 27, 'BOY', 8900]
+    ['40x20x1.5', 'Kutu Profil (1 Bağ = 150 Boy)', 6, 150, 'KG', 145],
+    ['50x50x2', 'Kare Profil (1 Bağ = 64 Boy)', 6, 64, 'BOY', 1850],
+    ['60,3 boru 2.5', 'Sanayi Borusu (1 Bağ = 61 Boy)', 6, 61, 'KG', 148],
+    ['80x40x3', '140 Hat Kutu (1 Bağ = 50 Boy)', 6, 50, 'KG', 150],
+    ['100x100x4', 'Ağır Kare Profil (1 Bağ = 25 Boy)', 6, 25, 'BOY', 8900]
   ];
   exportArrayToSpreadsheet(rows, 'Ornek_Siparis_Yukleme_Sablonu.xlsx', 'Siparis_Sablonu');
 }
@@ -3453,10 +4141,11 @@ function downloadSampleOrderExcel() {
 function exportFullSystemBackupJson() {
   const payload = {
     app: 'UMITCK ERP PWA',
-    version: '5.2.0',
+    version: '5.4.0',
     exportedAt: new Date().toISOString(),
     settings,
     molds,
+    bundleCounts,
     users,
     rolePermissions,
     quoteItems,
@@ -3495,6 +4184,7 @@ function renderFullMatrixTables() {
 
     const headCols = grp.cols.map((w) => `<th class="text-center mono">${w} mm</th>`).join('');
     const bodyRows = list.map((m) => {
+      const info = resolveMoldBundleInfo(m);
       const cells = grp.cols.map((w) => {
         const val = m.strips ? m.strips[w] : undefined;
         if (val === undefined) return `<td class="text-center text-muted">—</td>`;
@@ -3510,11 +4200,17 @@ function renderFullMatrixTables() {
 
       return `
         <tr>
-          <td><span class="badge ${grp.badgeCls} mono">${escapeHtml(m.kalip)}</span></td>
-          <td><strong>${escapeHtml(m.label)}</strong> <span class="text-muted" style="font-size:0.72rem;">(${escapeHtml(m.type)})</span></td>
-          <td class="text-center mono fw-700">${m.defaultBag}</td>
+          <td class="sticky-col">
+            <strong>${escapeHtml(m.label)}</strong>
+            <div class="mono text-muted" style="font-size:0.68rem;">${escapeHtml(m.kalip)}</div>
+          </td>
+          <td class="text-center">
+            <span class="badge ${info.isApprox ? 'badge-amber' : 'badge-emerald'} mono" title="${escapeHtml(info.not || '')}">
+              ${info.isApprox ? '≈' : ''}${m.defaultBag}${info.dizilim ? ` (${escapeHtml(info.dizilim)})` : ''}
+            </span>
+          </td>
           ${cells}
-          <td style="font-size:0.73rem;color:var(--text-muted);">${escapeHtml(m.note || '')}</td>
+          <td style="font-size:0.72rem;color:var(--text-muted);min-width:120px;">${escapeHtml(m.note || '')}</td>
         </tr>
       `;
     }).join('');
@@ -3523,11 +4219,10 @@ function renderFullMatrixTables() {
       <div>
         <div style="font-size:0.84rem;font-weight:800;margin-bottom:6px;color:var(--primary);">${grp.title} (${list.length} Profil)</div>
         <div class="table-wrap">
-          <table class="corp-table">
+          <table class="corp-table matrix-table">
             <thead>
               <tr>
-                <th>Kalıp</th>
-                <th>Profil Ölçüsü</th>
+                <th class="sticky-col">Profil / Kalıp</th>
                 <th class="text-center">1 Bağ</th>
                 ${headCols}
                 <th>Not</th>
@@ -3659,13 +4354,14 @@ function applyRolePermissionsToUI() {
 
 // --- Yönetim Paneli Alt Sekmeler & Form Yönetimi ---
 function switchAdminSubTab(sub) {
-  ['general', 'pricing', 'molds', 'roles'].forEach((k) => {
+  ['general', 'pricing', 'molds', 'bundles', 'roles'].forEach((k) => {
     const btn = document.getElementById('admSub_' + k);
     const panel = document.getElementById('admPanel_' + k);
     if (btn) btn.classList.toggle('active', k === sub);
     if (panel) panel.classList.toggle('hidden', k !== sub);
   });
   if (sub === 'molds') renderAdminMoldTable();
+  if (sub === 'bundles') renderAdminBundleTable();
   if (sub === 'roles') renderAdminUsersAndPermissions();
 }
 
@@ -3711,6 +4407,7 @@ function populateAdminForm() {
   if (pinChk) pinChk.checked = !!settings.requirePinOnSwitch;
 
   renderAdminMoldTable();
+  renderAdminBundleTable();
   renderAdminUsersAndPermissions();
 }
 
@@ -3775,11 +4472,13 @@ function saveAdminSettingsFromForm() {
 
 function resetFactoryDefaultsConfirm() {
   if (currentUser.role !== 'admin') return;
-  if (!window.confirm('Tüm kalıp, fiyat, kurumsal kimlik ve rol ayarları ilk fabrika değerlerine döndürülecek. Onaylıyor musunuz?')) {
+  if (!window.confirm('Tüm kalıp, bağ adedi, fiyat, kurumsal kimlik ve rol ayarları ilk fabrika değerlerine döndürülecek. Onaylıyor musunuz?')) {
     return;
   }
   settings = cloneObj(DEFAULT_SETTINGS);
+  bundleCounts = buildDefaultBundleCounts();
   molds = cloneObj(DEFAULT_MOLDS);
+  syncMoldsWithBundleTable(true);
   users = cloneObj(DEFAULT_USERS);
   rolePermissions = cloneObj(DEFAULT_PERMISSIONS);
   currentUser = users[0];
@@ -3802,18 +4501,24 @@ function renderAdminMoldTable() {
   });
 
   tbody.innerHTML = filtered.map((m) => {
+    const info = resolveMoldBundleInfo(m);
     const stripSummary = Object.entries(m.strips || {})
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(([w, s]) => `<span class="badge badge-neutral mono" style="margin:1px;">${w}→<b>${s}</b></span>`)
       .join(' ');
     const badgeCls = m.line === '63' ? 'badge-blue' : 'badge-purple';
+    const bagCls = info.isApprox ? 'badge-amber' : 'badge-emerald';
     return `
       <tr>
         <td><span class="badge ${badgeCls}">${escapeHtml(m.line)}H</span></td>
         <td class="mono fw-700">${escapeHtml(m.kalip)}</td>
         <td>${escapeHtml(m.type)}</td>
         <td><strong>${escapeHtml(m.label)}</strong></td>
-        <td class="text-center mono fw-800">${m.defaultBag}</td>
+        <td class="text-center">
+          <span class="badge ${bagCls} mono" title="${escapeHtml(info.not || '')}">
+            ${info.isApprox ? '≈' : ''}${m.defaultBag}${info.dizilim ? ` (${escapeHtml(info.dizilim)})` : ''}
+          </span>
+        </td>
         <td>${stripSummary}</td>
         <td style="font-size:0.74rem;color:var(--text-muted);">${escapeHtml(m.note || '')}</td>
         <td class="text-center">
@@ -3822,6 +4527,14 @@ function renderAdminMoldTable() {
       </tr>
     `;
   }).join('');
+}
+
+function getEditMoldComputedBundleInfo() {
+  const tp = document.getElementById('editMoldType')?.value || 'Kutu';
+  const a = Math.max(1, parseFloat(document.getElementById('editMoldA')?.value) || 40);
+  const b = tp === 'Boru' ? 0 : Math.max(1, parseFloat(document.getElementById('editMoldB')?.value) || a);
+  const shp = tp === 'Boru' ? 'pipe' : (Math.abs(a - b) < 0.05 ? 'square' : 'box');
+  return resolveCustomBundleInfo(shp, a, b);
 }
 
 function openMoldEditorModal(moldId) {
@@ -3835,11 +4548,14 @@ function openMoldEditorModal(moldId) {
   document.getElementById('editMoldLine').value = existing ? existing.line : '63';
   document.getElementById('editMoldKalip').value = existing ? existing.kalip : '38Ø';
   document.getElementById('editMoldType').value = existing ? existing.type : 'Kutu';
-  document.getElementById('editMoldBag').value = existing ? existing.defaultBag : 60;
   document.getElementById('editMoldLabel').value = existing ? existing.label : '';
   document.getElementById('editMoldA').value = existing ? existing.a : 40;
   document.getElementById('editMoldB').value = existing ? (existing.b || 0) : 20;
   document.getElementById('editMoldNote').value = existing ? (existing.note || '') : '';
+
+  const initBag = existing ? existing.defaultBag : resolveCustomBundleInfo('box', 40, 20).adet;
+  document.getElementById('editMoldBag').value = initBag;
+  window._autoMoldBagLast = initBag;
 
   document.getElementById('btnDeleteMoldModal').classList.toggle('hidden', !existing);
 
@@ -3873,6 +4589,28 @@ function onEditMoldTypeChange() {
   } else {
     inpB.disabled = false;
   }
+  onEditMoldDimChange();
+}
+
+function onEditMoldDimChange() {
+  const isNew = !document.getElementById('editMoldId')?.value;
+  const bagInp = document.getElementById('editMoldBag');
+  if (!bagInp) return;
+  if (isNew && Number(bagInp.value) === window._autoMoldBagLast) {
+    const info = getEditMoldComputedBundleInfo();
+    bagInp.value = info.adet;
+    window._autoMoldBagLast = info.adet;
+  }
+}
+
+function autoFillEditMoldBag() {
+  const info = getEditMoldComputedBundleInfo();
+  const bagInp = document.getElementById('editMoldBag');
+  if (bagInp) {
+    bagInp.value = info.adet;
+    window._autoMoldBagLast = info.adet;
+  }
+  showToast(`📦 Kalıp Listesi bağ adedi uygulandı: ${info.isApprox ? '≈' : ''}${info.adet} Boy${info.dizilim ? ' (' + info.dizilim + ')' : ''}`);
 }
 
 function saveMoldFromModal() {
@@ -3881,9 +4619,11 @@ function saveMoldFromModal() {
   const line = document.getElementById('editMoldLine').value;
   const kalip = document.getElementById('editMoldKalip').value.trim() || 'Özel';
   const type = document.getElementById('editMoldType').value;
-  const defaultBag = Math.max(1, parseInt(document.getElementById('editMoldBag').value) || 30);
   const a = Math.max(1, parseFloat(document.getElementById('editMoldA').value) || 40);
   const b = type === 'Boru' ? 0 : Math.max(1, parseFloat(document.getElementById('editMoldB').value) || a);
+  const shape = type === 'Boru' ? 'pipe' : (Math.abs(a - b) < 0.05 ? 'square' : 'box');
+  const tableInfo = resolveCustomBundleInfo(shape, a, b);
+  const defaultBag = Math.max(1, parseInt(document.getElementById('editMoldBag').value) || tableInfo.adet);
   const label = document.getElementById('editMoldLabel').value.trim() || (type === 'Boru' ? `Ø${a} Boru` : `${a}x${b}`);
   const note = document.getElementById('editMoldNote').value.trim();
 
@@ -3901,7 +4641,8 @@ function saveMoldFromModal() {
     return;
   }
 
-  const shape = type === 'Boru' ? 'pipe' : (Math.abs(a - b) < 0.05 ? 'square' : 'box');
+  const isCustomBag = defaultBag !== tableInfo.adet;
+  const existingRef = id ? molds.find((x) => x.id === id) : null;
   const record = {
     id: id || `${line}_custom_${Date.now()}`,
     line,
@@ -3909,10 +4650,15 @@ function saveMoldFromModal() {
     type,
     shape,
     label,
-    aliases: type === 'Kutu' && Math.abs(a - b) > 0.1 ? `${b}x${a} ${a}*${b}` : '',
+    aliases: (existingRef && existingRef.aliases) || (type === 'Kutu' && Math.abs(a - b) > 0.1 ? `${b}x${a} ${a}*${b}` : ''),
     a,
     b,
     defaultBag,
+    bagSource: isCustomBag ? 'tanım' : tableInfo.kaynak,
+    bagLayout: isCustomBag
+      ? describeBundleLayout(bagOlcuCoz(type === 'Boru' ? `Ø${a}` : `${a}x${b}`), defaultBag, '')
+      : (tableInfo.dizilim || ''),
+    ...(isCustomBag ? { customBagLocked: true } : {}),
     note,
     strips
   };
@@ -3929,6 +4675,7 @@ function saveMoldFromModal() {
   syncMasterConfigToFirebase();
   refreshAllViewsAfterConfigUpdate();
   renderAdminMoldTable();
+  renderAdminBundleTable();
   showToast(`✅ ${record.label} kalıp veritabanına kaydedildi.`);
 }
 
@@ -3946,7 +4693,202 @@ function deleteMoldFromModal() {
   syncMasterConfigToFirebase();
   refreshAllViewsAfterConfigUpdate();
   renderAdminMoldTable();
+  renderAdminBundleTable();
   showToast('Kalıp silindi.');
+}
+
+// --- Bağ Adetleri Tanım Tablosu (Kalıp Listesi) Yönetimi ---
+function syncAllMoldsBundleCountsFromTable(forceUnlock = true) {
+  if (!hasPerm('manageMolds')) {
+    showToast('Kalıp ve bağ adedi eşitleme yetkiniz yok.', true);
+    return;
+  }
+  syncMoldsWithBundleTable(!!forceUnlock);
+  syncMasterConfigToFirebase();
+  refreshAllViewsAfterConfigUpdate();
+  renderAdminMoldTable();
+  renderAdminBundleTable();
+  showToast(`✅ Tüm ${molds.length} kalıbın 1 bağ adedi Kalıp Listesi tablosuyla eşitlendi!`);
+}
+
+function renderAdminBundleTable() {
+  const tbody = document.getElementById('admBundleTableBody');
+  const estBanner = document.getElementById('admEstimatedMoldsBanner');
+  if (!tbody) return;
+
+  if (estBanner) {
+    const seenEstKeys = new Set();
+    const estMolds = [];
+    molds.forEach((m) => {
+      const info = resolveMoldBundleInfo(m);
+      if (info.isApprox && info.olcu) {
+        const k = bagAnahtari(info.olcu);
+        if (!seenEstKeys.has(k)) {
+          seenEstKeys.add(k);
+          estMolds.push({ mold: m, info });
+        }
+      }
+    });
+
+    if (estMolds.length > 0) {
+      estBanner.innerHTML = `
+        <div style="padding:9px 11px;border-radius:9px;background:var(--amber-soft);border:1px solid var(--amber-border);font-size:0.76rem;">
+          <div style="font-weight:800;color:var(--amber);margin-bottom:6px;">
+            ≈ Komşu Ölçülerden Otomatik Hesaplanan Kalıplar (${estMolds.length} Ölçü) — Tek tıkla tabloya sabitleyebilirsiniz:
+          </div>
+          <div class="row-wrap" style="gap:6px;">
+            ${estMolds.map(({ mold, info }) => `
+              <button type="button" onclick="approveEstimatedBundleToTable('${mold.id}')" class="chip mono" style="padding:3px 9px;font-size:0.73rem;border-color:var(--amber-border);" title="${escapeHtml(info.not || '')}">
+                ${escapeHtml(mold.label.replace(/\s*\((63H|140H)\)/g, ''))} → <b>≈${info.adet}</b>${info.dizilim ? ` (${escapeHtml(info.dizilim)})` : ''} <span class="text-emerald">+Sabitle</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      estBanner.innerHTML = `
+        <div style="padding:7px 10px;border-radius:8px;background:var(--emerald-soft);border:1px solid var(--emerald-border);color:var(--emerald);font-size:0.75rem;font-weight:700;">
+          ✓ Tüm aktif fabrika kalıplarının bağ adetleri tabloda doğrudan tanımlıdır.
+        </div>
+      `;
+    }
+  }
+
+  const kindMeta = {
+    ROUND: { label: 'Yuvarlak Boru (Ø)', cls: 'badge-blue' },
+    SQUARE: { label: 'Kare Profil', cls: 'badge-purple' },
+    RECT: { label: 'Dikdörtgen Profil', cls: 'badge-emerald' },
+    TEK: { label: 'Tek Parça (Sac/Lama)', cls: 'badge-neutral' }
+  };
+
+  const sorted = bagSirala(bundleCounts);
+  tbody.innerHTML = sorted.map((r) => {
+    const km = kindMeta[r.kind] || { label: r.kind, cls: 'badge-neutral' };
+    const parsedO = r.kind === 'TEK' ? { kind: 'TEK' } : (r.kind === 'ROUND' ? bagRoundOf(r.od) : bagBoxOf(r.a, r.b));
+    const lay = describeBundleLayout(parsedO, r.pcs, r.note);
+    return `
+      <tr>
+        <td><span class="badge ${km.cls}">${escapeHtml(km.label)}</span></td>
+        <td class="mono fw-800">${escapeHtml(r.size)}</td>
+        <td class="text-center mono fw-800 text-emerald" style="font-size:0.9rem;">${r.pcs} Boy</td>
+        <td style="font-size:0.76rem;color:var(--text-secondary);">
+          ${lay ? `<span class="badge badge-neutral mono" style="margin-right:5px;">${escapeHtml(lay)}</span>` : ''}
+          ${escapeHtml(r.note || '')}
+        </td>
+        <td class="text-center">
+          <div class="row-wrap" style="justify-content:center;">
+            <button type="button" onclick="loadBundleRowIntoForm('${escapeHtml(r.key)}')" class="btn btn-outline btn-sm">Düzenle</button>
+            <button type="button" onclick="deleteBundleCountRow('${escapeHtml(r.key)}')" class="btn btn-danger btn-sm">Sil</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function loadBundleRowIntoForm(rowKey) {
+  const found = bundleCounts.find((r) => r.key === rowKey);
+  if (!found) return;
+  const kEl = document.getElementById('admBagKind');
+  const sEl = document.getElementById('admBagSize');
+  const pEl = document.getElementById('admBagPcs');
+  if (kEl) kEl.value = found.kind;
+  if (sEl) sEl.value = found.size;
+  if (pEl) {
+    pEl.value = found.pcs;
+    pEl.focus();
+  }
+}
+
+function saveBundleCountDefinitionFromForm() {
+  if (!hasPerm('manageMolds')) {
+    showToast('Bağ adedi tablosunu düzenleme yetkiniz yok.', true);
+    return;
+  }
+  const kind = document.getElementById('admBagKind')?.value || 'RECT';
+  const size = document.getElementById('admBagSize')?.value?.trim() || '';
+  const pcs = parseInt(document.getElementById('admBagPcs')?.value) || 0;
+
+  if (pcs < 1) {
+    showToast('Lütfen 1 bağdaki boy adedini (en az 1) girin.', true);
+    return;
+  }
+
+  try {
+    const rec = normalizeBagKaydi({ kind, size, pcs });
+    const parsedO = rec.kind === 'TEK' ? { kind: 'TEK' } : (rec.kind === 'ROUND' ? bagRoundOf(rec.od) : bagBoxOf(rec.a, rec.b));
+    const autoLay = describeBundleLayout(parsedO, rec.pcs, '');
+    if (autoLay && !rec.note) rec.note = `${autoLay} dizilim`;
+
+    const existingIdx = bundleCounts.findIndex((r) => r.key === rec.key);
+    if (existingIdx !== -1) bundleCounts[existingIdx] = rec;
+    else bundleCounts.push(rec);
+
+    bundleCounts = bagSirala(bundleCounts);
+    syncMoldsWithBundleTable(false);
+    syncMasterConfigToFirebase();
+    refreshAllViewsAfterConfigUpdate();
+    renderAdminBundleTable();
+    renderAdminMoldTable();
+
+    document.getElementById('admBagSize').value = '';
+    document.getElementById('admBagPcs').value = '';
+    showToast(`📦 ${rec.size} → 1 Bağ = ${rec.pcs} Boy kaydedildi!`);
+  } catch (err) {
+    showToast(err.message || 'Geçerli bir ölçü girin (örn: Ø49, 40x20, 70x70).', true);
+  }
+}
+
+function approveEstimatedBundleToTable(moldId) {
+  if (!hasPerm('manageMolds')) return;
+  const m = molds.find((x) => x.id === moldId);
+  if (!m) return;
+  const info = resolveMoldBundleInfo(m);
+  try {
+    const rec = normalizeBagKaydi({
+      kind: m.type === 'Boru' ? 'ROUND' : (m.shape === 'square' ? 'SQUARE' : 'RECT'),
+      od: m.type === 'Boru' ? m.a : 0,
+      a: m.a,
+      b: m.b || m.a,
+      pcs: info.adet,
+      note: info.dizilim ? `${info.dizilim} dizilim` : 'Kalıp listesinden sabitlendi'
+    });
+    const idx = bundleCounts.findIndex((r) => r.key === rec.key);
+    if (idx !== -1) bundleCounts[idx] = rec;
+    else bundleCounts.push(rec);
+    bundleCounts = bagSirala(bundleCounts);
+    syncMoldsWithBundleTable(false);
+    syncMasterConfigToFirebase();
+    refreshAllViewsAfterConfigUpdate();
+    renderAdminBundleTable();
+    renderAdminMoldTable();
+    showToast(`✓ ${rec.size} = ${rec.pcs} Boy bağ tablosuna sabitlendi.`);
+  } catch (err) {
+    showToast('Bağ kaydı sabitlenemedi.', true);
+  }
+}
+
+function deleteBundleCountRow(rowKey) {
+  if (!hasPerm('manageMolds')) return;
+  bundleCounts = bundleCounts.filter((r) => r.key !== rowKey);
+  syncMoldsWithBundleTable(false);
+  syncMasterConfigToFirebase();
+  refreshAllViewsAfterConfigUpdate();
+  renderAdminBundleTable();
+  renderAdminMoldTable();
+  showToast('Bağ tanımı listeden kaldırıldı (komşu ölçülerden otomatik hesaplanacak).');
+}
+
+function resetBundleTableToFactorySeed() {
+  if (!hasPerm('manageMolds')) return;
+  bundleCounts = buildDefaultBundleCounts();
+  syncMoldsWithBundleTable(true);
+  settings.bundleSchemaVersion = BUNDLE_SCHEMA_VERSION;
+  syncMasterConfigToFirebase();
+  refreshAllViewsAfterConfigUpdate();
+  renderAdminBundleTable();
+  renderAdminMoldTable();
+  showToast('📦 Fabrika Kalıp Listesi (35 standart ölçü) yüklendi ve 45 kalıpla eşitlendi!');
 }
 
 // --- Kullanıcılar, PIN ve RBAC Yetki Matrisi ---
@@ -4098,6 +5040,9 @@ function switchTab(tabId) {
     if (mBtn) mBtn.classList.toggle('active', t === tabId);
   });
 
+  const mobBar = document.getElementById('mobileLiveSummaryBar');
+  if (mobBar) mobBar.classList.toggle('hidden', tabId !== 'calc');
+
   if (tabId === 'quote') renderQuoteView();
   if (tabId === 'slit') renderSlitWorkspace();
   if (tabId === 'files') {
@@ -4105,6 +5050,7 @@ function switchTab(tabId) {
     renderVaultFilesList();
   }
   if (tabId === 'admin') populateAdminForm();
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function toggleTheme() {
@@ -4156,6 +5102,7 @@ function saveLocalMasterCache() {
     localStorage.setItem('umitck_v5_master_config', JSON.stringify({
       settings,
       molds,
+      bundleCounts,
       users,
       rolePermissions
     }));
@@ -4171,6 +5118,10 @@ function loadLocalMasterCache() {
       if (Array.isArray(data.molds) && data.molds.length) molds = data.molds;
       if (Array.isArray(data.users) && data.users.length) users = data.users;
       if (data.rolePermissions) rolePermissions = { ...cloneObj(DEFAULT_PERMISSIONS), ...data.rolePermissions };
+      const migrated = ensureBundleSchemaMigrated(data);
+      if (migrated) saveLocalMasterCache();
+    } else {
+      syncMoldsWithBundleTable(false);
     }
     const savedUid = localStorage.getItem('umitck_v5_active_user_id');
     if (savedUid) {
@@ -4278,7 +5229,16 @@ window.addEventListener('offline', updateNetworkStatusUI);
 
 function registerOfflineServiceWorker() {
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-    navigator.serviceWorker.register('./sw.js').catch((err) => {
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshingSw = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || refreshingSw) return;
+      refreshingSw = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      reg.update().catch(() => {});
+    }).catch((err) => {
       console.warn('Service Worker kayıt uyarısı:', err);
     });
   }
@@ -4303,7 +5263,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (ws.custLoc) document.getElementById('quoteCustLocation').value = ws.custLoc;
     if (ws.custPhone) document.getElementById('quoteCustPhone').value = ws.custPhone;
     if (Array.isArray(ws.quoteItems)) quoteItems = ws.quoteItems;
-    if (Array.isArray(ws.slitItems) && ws.slitItems.length) slitItems = ws.slitItems;
+    if (Array.isArray(ws.slitItems) && ws.slitItems.length) {
+      slitItems = ws.slitItems;
+      syncMoldsWithBundleTable(false);
+    }
     if (ws.length) document.getElementById('inputLength').value = ws.length;
     if (ws.bundles) document.getElementById('inputBundleCount').value = ws.bundles;
   }
@@ -4311,6 +5274,11 @@ document.addEventListener('DOMContentLoaded', () => {
   renderDynamicQuickChips();
   applyRolePermissionsToUI();
   setupDropzoneEvents();
+
+  if (typeof window.innerWidth === 'number' && window.innerWidth < 768) {
+    catalogCollapsed = true;
+  }
+  syncCatalogCollapseUI();
 
   const initialMoldId = (ws && ws.activeMoldId && molds.some((m) => m.id === ws.activeMoldId))
     ? ws.activeMoldId

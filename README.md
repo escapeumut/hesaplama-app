@@ -9,7 +9,7 @@ Canlı Firebase Uygulaması: **https://hesaplama-umitck.web.app**
 2. **Hatasız Algoritmik Ağırlık & Bant Hesaplama**
    - Doğrulanmış **45 Fabrika Kalıbı** (`63 Hat` + `140 Hat`) ve kantar senkronize bant genişlikleri.
    - Ara kalınlıklarda (`1.3`, `1.6`, `1.8`, `2.2`, `2.7`, `3.7 mm` vb.) doğrusal interpolasyon/ekstrapolasyon ile otomatik bant hesabı + **EN 10219-2** köşe radyüslü kesit doğrulaması.
-   - Bağ (Colisage), açık boy ve **Hedef Tonaj / 25T Tır Çözücü**.
+   - Bağ (Colisage) Motoru: Fabrika Kalıp Listesindeki **35 standart ölçü bağ tanımı** (`40x20 → 150 (10×15)`, `20x20 → 225 (15×15)`, `40x40 → 100 (10×10)`, `50x50 → 64 (8×8)`, `Ø48,3 → 91 (altıgen)`, `Ø60,3 → 61 (altıgen)`, `100x100 → 25 (5×5)`, `Ø139,7 → 14` vb.) + tanımsız ölçüler için komşu kalıp `satır×sütun` / `altıgen` dizilim tahmini (`≈`) + **Hedef Tonaj / 25T Tır Çözücü**.
 3. **Çift Yönlü Sıfır Sapmalı Fiyatlandırma (`KG Bazlı` & `BOY Bazlı`)**
    - Hem **1 KG Birim Fiyatı** hem **1 BOY (Adet) Satış Fiyatı** üzerinden yuvarlama kaybı olmadan çift yönlü hesaplama.
    - İskonto %, ayarlanabilir KDV / TVA % (`HT` / `TTC`), çoklu para birimi (`DA`, `₺`, `$`, `€`), WhatsApp (`TR` & `FR/DZ`), Excel (`.xlsx`) ve Kurumsal PDF yazdırma.
@@ -21,3 +21,4 @@ Canlı Firebase Uygulaması: **https://hesaplama-umitck.web.app**
 6. **Rol Bazlı Yetki Sistemi (RBAC) & Tam Yönetici Kontrolü + Firebase Canlı Senkronizasyon**
    - **Yönetici (`admin` — Varsayılan PIN: `1234`)**, **Satış (`sales` — PIN: `2222`)**, **Operatör (`operator`)**, **Misafir (`viewer`)** rolleri.
    - Yönetici kurumsal kimlik, yoğunluk, hat sınırları, fiyat/vergi/taban fiyat/gizli maliyet marjı, 45 kalıp CRUD veritabanı ve rol yetki matrisini tek panelden yönetir; tüm değişiklikler `hesaplama-umitck` Firestore bulutuna ve çevrimdışı hafızaya senkronize edilir.
+
